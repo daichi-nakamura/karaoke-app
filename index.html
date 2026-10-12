@@ -16,12 +16,15 @@
   <!-- ヘッダー -->
   <header class="sticky top-0 z-20 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 py-2.5">
     <div class="max-w-md mx-auto flex items-center justify-between">
-      <div class="flex items-center gap-1.5 bg-slate-800/80 p-1 rounded-xl border border-slate-700/60">
-        <button id="navTabMyList" onclick="switchMainTab('mylist')" class="px-3 py-1 rounded-lg text-xs font-bold transition bg-indigo-600 text-white shadow">
+      <div class="flex items-center gap-1 bg-slate-800/80 p-1 rounded-xl border border-slate-700/60 overflow-x-auto no-scrollbar">
+        <button id="navTabMyList" onclick="switchMainTab('mylist')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition bg-indigo-600 text-white shadow whitespace-nowrap">
           🎤 マイリスト
         </button>
-        <button id="navTabRanking" onclick="switchMainTab('ranking')" class="px-3 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">
-          🔥 流行・ランキング
+        <button id="navTabRecommend" onclick="switchMainTab('recommend')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white whitespace-nowrap">
+          ✨ 昔の名曲発掘
+        </button>
+        <button id="navTabRanking" onclick="switchMainTab('ranking')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white whitespace-nowrap">
+          🔥 流行
         </button>
       </div>
 
@@ -30,7 +33,7 @@
           📋 セトリ
           <span id="setlistBadge" class="hidden bg-indigo-500 text-white rounded-full px-1.5 py-0.2 text-[10px] font-mono">0</span>
         </button>
-        <button onclick="openModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow flex items-center gap-1 transition">
+        <button onclick="openModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow flex items-center gap-1 transition shrink-0">
           ＋ 追加
         </button>
       </div>
@@ -114,7 +117,30 @@
     <div id="songList" class="space-y-3"></div>
   </main>
 
-  <!-- ==================== 2. 流行・ランキング画面 ==================== -->
+  <!-- ==================== 2. あなたへのおすすめ発掘画面 ==================== -->
+  <main id="viewRecommend" class="max-w-md mx-auto p-4 space-y-3.5 hidden">
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="font-bold text-base text-white">✨ マイリスト分析 & 昔の名曲発掘</h2>
+        <p class="text-[11px] text-slate-400">登録済みアーティストの未登録曲や、よく歌う年代の名曲を発掘</p>
+      </div>
+      <button onclick="analyzeAndRecommend()" class="text-xs text-indigo-400 bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg hover:bg-slate-800">
+        🔄 再発掘
+      </button>
+    </div>
+
+    <!-- 分析サマリー -->
+    <div id="recommendInsight" class="bg-indigo-950/40 border border-indigo-900/60 p-3 rounded-xl text-xs text-indigo-200 space-y-1">
+      マイリストの傾向を分析中...
+    </div>
+
+    <!-- おすすめ曲一覧 -->
+    <div id="recommendList" class="space-y-2.5">
+      <div class="text-center text-slate-500 py-12 text-sm">おすすめ曲を探索中...</div>
+    </div>
+  </main>
+
+  <!-- ==================== 3. 流行・ランキング画面 ==================== -->
   <main id="viewRanking" class="max-w-md mx-auto p-4 space-y-3.5 hidden">
     <div class="flex items-center justify-between">
       <div>
@@ -301,7 +327,6 @@
       orderBy 
     } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 
-    // ★★★ ご自身のFirebase設定 ★★★
     const firebaseConfig = {
   apiKey: "AIzaSyCGxnALF5RNC1RvhE-IOEWDrHNnf4a56r4",
   authDomain: "karaoke-app-7feaf.firebaseapp.com",
@@ -347,6 +372,7 @@
   <script>
     window.songs = [];
     let rankingSongs = [];
+    let recommendedSongs = [];
     let currentRawITunesResults = [];
     let setlist = JSON.parse(localStorage.getItem('karaoke_setlist')) || [];
     let selectedGenre = null;
@@ -363,7 +389,6 @@
       renderSetlist();
     }
 
-    // デュエット曲かどうかの自動判定ロジック
     function checkIsDuet(title, artist) {
       const target = `${title || ''} ${artist || ''}`.toLowerCase();
       const duetPatterns = [
@@ -377,26 +402,104 @@
 
     window.switchMainTab = function(tab) {
       const btnMyList = document.getElementById('navTabMyList');
+      const btnRecommend = document.getElementById('navTabRecommend');
       const btnRanking = document.getElementById('navTabRanking');
       const viewMyList = document.getElementById('viewMyList');
+      const viewRecommend = document.getElementById('viewRecommend');
       const viewRanking = document.getElementById('viewRanking');
 
-      if (tab === 'mylist') {
-        btnMyList.className = "px-3 py-1 rounded-lg text-xs font-bold transition bg-indigo-600 text-white shadow";
-        btnRanking.className = "px-3 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white";
-        viewMyList.classList.remove('hidden');
-        viewRanking.classList.add('hidden');
-      } else {
-        btnRanking.className = "px-3 py-1 rounded-lg text-xs font-bold transition bg-indigo-600 text-white shadow";
-        btnMyList.className = "px-3 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white";
-        viewRanking.classList.remove('hidden');
-        viewMyList.classList.add('hidden');
-        if (rankingSongs.length === 0) {
-          loadRanking();
+      const tabs = [
+        { id: 'mylist', btn: btnMyList, view: viewMyList },
+        { id: 'recommend', btn: btnRecommend, view: viewRecommend },
+        { id: 'ranking', btn: btnRanking, view: viewRanking }
+      ];
+
+      tabs.forEach(t => {
+        if (t.id === tab) {
+          t.btn.className = "px-2.5 py-1 rounded-lg text-xs font-bold transition bg-indigo-600 text-white shadow whitespace-nowrap";
+          t.view.classList.remove('hidden');
+        } else {
+          t.btn.className = "px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white whitespace-nowrap";
+          t.view.classList.add('hidden');
         }
+      });
+
+      if (tab === 'ranking' && rankingSongs.length === 0) {
+        loadRanking();
+      } else if (tab === 'recommend' && recommendedSongs.length === 0) {
+        analyzeAndRecommend();
       }
     };
 
+    // ==================== 試聴再生（即時Lookupフォールバック付き） ====================
+    window.togglePlayPreview = async function(url, id, trackName = '', artistName = '', trackId = '') {
+      if (currentPlayingId === id && currentAudio) {
+        currentAudio.pause();
+        currentAudio = null;
+        currentPlayingId = null;
+        renderAllViews();
+        return;
+      }
+
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio = null;
+      }
+
+      let playableUrl = url;
+
+      // URLが無い場合はiTunes Lookup / Searchでリアルタイム解決
+      if (!playableUrl && (trackId || (trackName && artistName))) {
+        try {
+          let queryUrl = '';
+          if (trackId) {
+            queryUrl = `https://itunes.apple.com/lookup?id=${trackId}&country=jp`;
+          } else {
+            queryUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(trackName + ' ' + artistName)}&country=jp&entity=song&limit=1`;
+          }
+          const res = await fetch(queryUrl);
+          const data = await res.json();
+          if (data.results && data.results.length > 0 && data.results[0].previewUrl) {
+            playableUrl = data.results[0].previewUrl;
+            // キャッシュ更新
+            const rItem = rankingSongs.find(r => `ranking_${r.rank}` === id);
+            if (rItem) rItem.previewUrl = playableUrl;
+            const recItem = recommendedSongs.find((r, idx) => `rec_${idx}` === id);
+            if (recItem) recItem.previewUrl = playableUrl;
+          }
+        } catch (e) {
+          console.error("Preview resolve error:", e);
+        }
+      }
+
+      if (!playableUrl) {
+        alert("⚠️ この楽曲の試聴音源は見つかりませんでした");
+        return;
+      }
+
+      currentAudio = new Audio(playableUrl);
+      currentPlayingId = id;
+      currentAudio.play().catch(e => {
+        console.error("Playback failed:", e);
+        currentPlayingId = null;
+        renderAllViews();
+      });
+
+      currentAudio.onended = () => {
+        currentPlayingId = null;
+        renderAllViews();
+      };
+
+      renderAllViews();
+    };
+
+    function renderAllViews() {
+      render();
+      renderRanking();
+      renderRecommended();
+    }
+
+    // ==================== ランキング取得・描画 ====================
     window.loadRanking = async function() {
       const container = document.getElementById('rankingList');
       container.innerHTML = '<div class="text-center text-slate-500 py-12 text-sm">ランキングを取得中...</div>';
@@ -412,14 +515,17 @@
           const releaseDate = entry['im:releaseDate'] ? entry['im:releaseDate'].label : '';
           const year = releaseDate ? releaseDate.substring(0, 4) : '';
           const genre = entry.category && entry.category.attributes ? entry.category.attributes.label : 'J-Pop';
+          const trackId = entry.id && entry.id.attributes ? entry.id.attributes['im:id'] : '';
           
           let previewUrl = '';
           if (entry.link) {
-            const previewLink = entry.link.find(l => l.attributes && l.attributes.title === 'Preview');
-            if (previewLink) previewUrl = previewLink.attributes.href;
+            // link配列の中からpreview属性またはプレビューm4aを探す
+            const links = Array.isArray(entry.link) ? entry.link : [entry.link];
+            const pLink = links.find(l => (l.attributes && (l.attributes.title === 'Preview' || (l.attributes.href && l.attributes.href.includes('.m4a')))));
+            if (pLink) previewUrl = pLink.attributes.href;
           }
 
-          return { rank: idx + 1, title, artist, artwork, year, genre, previewUrl };
+          return { rank: idx + 1, trackId, title, artist, artwork, year, genre, previewUrl };
         });
 
         renderRanking();
@@ -436,7 +542,8 @@
       }
 
       container.innerHTML = rankingSongs.map(item => {
-        const isPlaying = currentPlayingId === `ranking_${item.rank}`;
+        const playId = `ranking_${item.rank}`;
+        const isPlaying = currentPlayingId === playId;
         const alreadyInList = (window.songs || []).some(s => s.title.toLowerCase() === item.title.toLowerCase() && s.artist.toLowerCase() === item.artist.toLowerCase());
         const encoded = encodeURIComponent(JSON.stringify(item));
 
@@ -444,13 +551,11 @@
           <div class="bg-slate-900/90 border border-slate-800 p-3 rounded-2xl flex items-center gap-3">
             <span class="font-mono font-bold text-sm text-indigo-400 w-5 text-center shrink-0">${item.rank}</span>
             
-            <div onclick="${item.previewUrl ? `togglePlayPreview('${item.previewUrl}', 'ranking_${item.rank}')` : ''}" class="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 cursor-pointer shadow border border-slate-800 bg-slate-800">
+            <div onclick="togglePlayPreview('${item.previewUrl || ''}', '${playId}', '${escapeHtml(item.title)}', '${escapeHtml(item.artist)}', '${item.trackId || ''}')" class="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 cursor-pointer shadow border border-slate-800 bg-slate-800">
               <img src="${item.artwork || ''}" class="w-full h-full object-cover">
-              ${item.previewUrl ? `
-                <div class="absolute inset-0 bg-black/40 flex items-center justify-center transition ${isPlaying ? 'opacity-100 bg-rose-950/70' : 'opacity-0 hover:opacity-100'}">
-                  <span class="text-xs text-white">${isPlaying ? '⏹' : '▶'}</span>
-                </div>
-              ` : ''}
+              <div class="absolute inset-0 bg-black/40 flex items-center justify-center transition ${isPlaying ? 'opacity-100 bg-rose-950/70' : 'opacity-0 hover:opacity-100'}">
+                <span class="text-xs text-white">${isPlaying ? '⏹' : '▶'}</span>
+              </div>
             </div>
             
             <div class="min-w-0 flex-1">
@@ -469,6 +574,133 @@
       }).join('');
     }
 
+    // ==================== マイリスト分析 & 昔の名曲発掘ロジック ====================
+    window.analyzeAndRecommend = async function() {
+      const insightEl = document.getElementById('recommendInsight');
+      const listEl = document.getElementById('recommendList');
+
+      if (!window.songs || window.songs.length === 0) {
+        insightEl.innerHTML = 'マイリストに曲が登録されていません。まずは好きな曲をいくつか登録してください！';
+        listEl.innerHTML = '<div class="text-center text-slate-500 py-12 text-sm">マイリストが空です</div>';
+        return;
+      }
+
+      insightEl.innerHTML = 'マイリストの歌手・年代プロファイルを解析して候補を探索中...';
+      listEl.innerHTML = '<div class="text-center text-slate-500 py-12 text-sm">昔の名曲・関連曲を発掘中...</div>';
+
+      // 1. アーティスト出現頻度集計
+      const artistCounts = {};
+      const decadeCounts = { '90s': 0, '2000s': 0, '2010s': 0, '2020s': 0 };
+
+      window.songs.forEach(s => {
+        if (s.artist) {
+          const mainArtist = s.artist.split(/[,&×/feat.]+/i)[0].trim();
+          if (mainArtist) artistCounts[mainArtist] = (artistCounts[mainArtist] || 0) + 1;
+        }
+        const yr = parseInt(s.year, 10);
+        if (yr) {
+          if (yr < 2000) decadeCounts['90s']++;
+          else if (yr < 2010) decadeCounts['2000s']++;
+          else if (yr < 2020) decadeCounts['2010s']++;
+          else decadeCounts['2020s']++;
+        }
+      });
+
+      // 上位アーティスト（最大3組）
+      const topArtists = Object.keys(artistCounts).sort((a, b) => artistCounts[b] - artistCounts[a]).slice(0, 3);
+      // 最多年代
+      const topDecade = Object.keys(decadeCounts).reduce((a, b) => decadeCounts[a] > decadeCounts[b] ? a : b);
+      const decadeLabel = { '90s': '90年代以前', '2000s': '2000年代', '2010s': '2010年代', '2020s': '2020年代' }[topDecade];
+
+      insightEl.innerHTML = `
+        <div class="font-bold text-indigo-300">💡 あなたのカラオケプロファイル</div>
+        <div>よく歌う歌手: <strong class="text-white">${topArtists.join(', ') || '未特定'}</strong></div>
+        <div>中心年代: <strong class="text-white">${decadeLabel}</strong>（昔よく聴いた曲を優先発掘）</div>
+      `;
+
+      // 2. iTunes API から上位アーティストの代表曲・同年代曲を取得
+      const fetchedCandidates = [];
+      const myTitles = new Set(window.songs.map(s => (s.title || '').toLowerCase().replace(/\s+/g, '')));
+
+      for (const artist of topArtists) {
+        try {
+          const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(artist)}&country=jp&entity=song&limit=15`);
+          const data = await res.json();
+          if (data.results) {
+            data.results.forEach(item => {
+              const cleanedTitle = (item.trackName || '').toLowerCase().replace(/\s+/g, '');
+              if (!myTitles.has(cleanedTitle)) {
+                fetchedCandidates.push({
+                  title: item.trackName,
+                  artist: item.artistName,
+                  year: item.releaseDate ? item.releaseDate.substring(0, 4) : '',
+                  genre: item.primaryGenreName || 'J-Pop',
+                  artwork: item.artworkUrl100 || '',
+                  previewUrl: item.previewUrl || '',
+                  durationMs: item.trackTimeMillis || 0,
+                  reason: `好きな歌手「${artist}」の未登録人気曲`
+                });
+              }
+            });
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      // 重複除去 & シャッフル
+      const uniqueMap = new Map();
+      fetchedCandidates.forEach(c => {
+        const k = `${c.title}_${c.artist}`.toLowerCase();
+        if (!uniqueMap.has(k)) uniqueMap.set(k, c);
+      });
+
+      recommendedSongs = Array.from(uniqueMap.values())
+        .sort(() => 0.5 - Math.random())
+        .slice(0, 20);
+
+      renderRecommended();
+    };
+
+    function renderRecommended() {
+      const container = document.getElementById('recommendList');
+      if (recommendedSongs.length === 0) {
+        container.innerHTML = '<div class="text-center text-slate-500 py-12 text-sm">発掘できる新曲が見つかりませんでした</div>';
+        return;
+      }
+
+      container.innerHTML = recommendedSongs.map((item, idx) => {
+        const playId = `rec_${idx}`;
+        const isPlaying = currentPlayingId === playId;
+        const alreadyInList = (window.songs || []).some(s => s.title.toLowerCase() === item.title.toLowerCase() && s.artist.toLowerCase() === item.artist.toLowerCase());
+        const encoded = encodeURIComponent(JSON.stringify(item));
+
+        return `
+          <div class="bg-slate-900/90 border border-slate-800 p-3 rounded-2xl flex items-center gap-3">
+            <div onclick="togglePlayPreview('${item.previewUrl || ''}', '${playId}', '${escapeHtml(item.title)}', '${escapeHtml(item.artist)}')" class="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 cursor-pointer shadow border border-slate-800 bg-slate-800">
+              <img src="${item.artwork || ''}" class="w-full h-full object-cover">
+              <div class="absolute inset-0 bg-black/40 flex items-center justify-center transition ${isPlaying ? 'opacity-100 bg-rose-950/70' : 'opacity-0 hover:opacity-100'}">
+                <span class="text-xs text-white">${isPlaying ? '⏹' : '▶'}</span>
+              </div>
+            </div>
+            
+            <div class="min-w-0 flex-1">
+              <div class="font-bold text-sm text-white truncate">${escapeHtml(item.title)}</div>
+              <div class="text-xs text-slate-400 truncate">${escapeHtml(item.artist)}</div>
+              <div class="text-[10px] text-indigo-400 mt-0.5 truncate">${escapeHtml(item.reason || '')} • ${item.year}年</div>
+            </div>
+
+            <div class="flex flex-col items-end gap-1.5 shrink-0">
+              <button onclick="addFromRanking('${encoded}')" class="text-xs px-2.5 py-1 rounded-lg font-bold border transition ${alreadyInList ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-500'}">
+                ${alreadyInList ? '登録済' : '＋ 追加'}
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ==================== モーダル・iTunes検索・データ追加 ====================
     window.addFromRanking = function(encoded) {
       const data = JSON.parse(decodeURIComponent(encoded));
       openModal();
@@ -479,7 +711,6 @@
       document.getElementById('formArtwork').value = data.artwork;
       document.getElementById('formPreviewUrl').value = data.previewUrl;
       
-      // デュエット判定
       const isDuet = checkIsDuet(data.title, data.artist);
       document.getElementById('formDuetType').value = isDuet ? 'duet' : 'solo';
 
@@ -487,7 +718,9 @@
       const tags = [];
       if (yr >= 2020) tags.push('2020年代');
       else if (yr >= 2010) tags.push('2010年代');
-      tags.push('流行・ヒット');
+      else if (yr >= 2000) tags.push('2000年代');
+      else if (yr < 2000) tags.push('90年代以前');
+      tags.push('発掘・おすすめ');
       document.getElementById('formTags').value = tags.join(', ');
     };
 
@@ -597,7 +830,7 @@
       document.getElementById('apiSortRow').classList.add('hidden');
     };
 
-    // セトリ管理
+    // ==================== セトリ管理 ====================
     window.toggleSetlistDrawer = function() {
       document.getElementById('setlistDrawer').classList.toggle('translate-y-full');
     };
@@ -685,46 +918,11 @@
       }).join('');
     };
 
-    window.togglePlayPreview = function(url, id) {
-      if (!url) return;
-      if (currentPlayingId === id && currentAudio) {
-        currentAudio.pause();
-        currentAudio = null;
-        currentPlayingId = null;
-        render();
-        renderRanking();
-        return;
-      }
-      if (currentAudio) {
-        currentAudio.pause();
-      }
-      currentAudio = new Audio(url);
-      currentPlayingId = id;
-      currentAudio.play();
-      currentAudio.onended = () => {
-        currentPlayingId = null;
-        render();
-        renderRanking();
-      };
-      render();
-      renderRanking();
-    };
-
     function escapeHtml(str) {
       return (str || '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
     }
 
-    function formatDate(ts) {
-      if (!ts) return '未歌唱';
-      const diff = Date.now() - ts;
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      if (days === 0) return '今日歌った';
-      if (days === 1) return '昨日歌った';
-      if (days < 30) return `${days}日前に歌唱`;
-      const d = new Date(ts);
-      return `${d.getMonth() + 1}/${d.getDate()}に歌唱`;
-    }
-
+    // ==================== マイリスト描画 ====================
     window.render = function() {
       const queryStr = document.getElementById('searchInput').value.toLowerCase();
       const sortMode = document.getElementById('sortSelect').value;
@@ -865,11 +1063,9 @@
                 </button>
               </div>
               <div class="flex items-center gap-2">
-                ${s.previewUrl ? `
-                  <button onclick="togglePlayPreview('${s.previewUrl}', '${s.id}')" class="text-xs px-2 py-0.5 rounded-md font-medium border flex items-center gap-1 ${isPlaying ? 'bg-rose-900 border-rose-700 text-rose-200' : 'bg-slate-800 border-slate-700 text-slate-300'}">
-                    ${isPlaying ? '⏹ 停止' : '▶ 試聴'}
-                  </button>
-                ` : ''}
+                <button onclick="togglePlayPreview('${s.previewUrl || ''}', '${s.id}', '${escapeHtml(s.title)}', '${escapeHtml(s.artist)}')" class="text-xs px-2 py-0.5 rounded-md font-medium border flex items-center gap-1 ${isPlaying ? 'bg-rose-900 border-rose-700 text-rose-200' : 'bg-slate-800 border-slate-700 text-slate-300'}">
+                  ${isPlaying ? '⏹ 停止' : '▶ 試聴'}
+                </button>
                 <a href="${lyricsSearchUrl}" target="_blank" rel="noopener" class="text-slate-400 hover:text-sky-400 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/60 flex items-center gap-1">
                   📄 歌詞
                 </a>
