@@ -876,11 +876,13 @@ window.selectITunesSong = function(encoded) {
 
 // セットリスト
 window.toggleSetlistDrawer = function() {
-  document.getElementById('setlistDrawer').classList.toggle('translate-y-full');
+  const drawer = document.getElementById('setlistDrawer');
+  if (drawer) drawer.classList.toggle('translate-y-full');
 };
 window.addToSetlist = function(id) {
   if (!setlist.includes(id)) { setlist.push(id); saveSetlist(); }
-  document.getElementById('setlistDrawer').classList.remove('translate-y-full');
+  const drawer = document.getElementById('setlistDrawer');
+  if (drawer) drawer.classList.remove('translate-y-full');
 };
 window.removeFromSetlist = function(id) {
   setlist = setlist.filter(x => x !== id);
@@ -1027,174 +1029,178 @@ function getCurrentFilteredSongs() {
 }
 
 window.render = function() {
-  const sortSelect = document.getElementById('sortSelect');
-  const sortMode = sortSelect ? sortSelect.value : 'lastSung';
-  let filtered = getCurrentFilteredSongs();
+  try {
+    const sortSelect = document.getElementById('sortSelect');
+    const sortMode = sortSelect ? sortSelect.value : 'lastSung';
+    let filtered = getCurrentFilteredSongs();
 
-  filtered.sort((a, b) => {
-    if (sortMode === 'lastSung') return (b.lastSungAt || 0) - (a.lastSungAt || 0);
-    if (sortMode === 'singCount') return (b.singCount || 0) - (a.singCount || 0);
-    if (sortMode === 'scoreVal') return (parseFloat(b.scoreVal) || 0) - (parseFloat(a.scoreVal) || 0);
-    if (sortMode === 'releaseYear') return (parseInt(b.year, 10) || 0) - (parseInt(a.year, 10) || 0);
-    if (sortMode === 'title') return (a.title || '').localeCompare(b.title || '', 'ja');
-    return (b.createdAt || 0) - (a.createdAt || 0);
-  });
+    filtered.sort((a, b) => {
+      if (sortMode === 'lastSung') return (b.lastSungAt || 0) - (a.lastSungAt || 0);
+      if (sortMode === 'singCount') return (b.singCount || 0) - (a.singCount || 0);
+      if (sortMode === 'scoreVal') return (parseFloat(b.scoreVal) || 0) - (parseFloat(a.scoreVal) || 0);
+      if (sortMode === 'releaseYear') return (parseInt(b.year, 10) || 0) - (parseInt(a.year, 10) || 0);
+      if (sortMode === 'title') return (a.title || '').localeCompare(b.title || '', 'ja');
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    });
 
-  const allGenres = Array.from(new Set((window.songs || []).map(s => s.genre).filter(Boolean)));
-  const genreContainer = document.getElementById('genreFilterList');
-  if (genreContainer) {
-    genreContainer.innerHTML = '';
-    if (allGenres.length > 0) {
-      genreContainer.innerHTML += `<button onclick="window.setFilterGenre(null)" class="px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 transition ${selectedGenre === null ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">全ジャンル</button>`;
-      allGenres.forEach(g => {
-        genreContainer.innerHTML += `<button onclick="window.setFilterGenre('${g}')" class="px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 transition ${selectedGenre === g ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">${escapeHtml(g)}</button>`;
-      });
+    const allGenres = Array.from(new Set((window.songs || []).map(s => s.genre).filter(Boolean)));
+    const genreContainer = document.getElementById('genreFilterList');
+    if (genreContainer) {
+      genreContainer.innerHTML = '';
+      if (allGenres.length > 0) {
+        genreContainer.innerHTML += `<button onclick="window.setFilterGenre(null)" class="px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 transition ${selectedGenre === null ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">全ジャンル</button>`;
+        allGenres.forEach(g => {
+          genreContainer.innerHTML += `<button onclick="window.setFilterGenre('${g}')" class="px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 transition ${selectedGenre === g ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">${escapeHtml(g)}</button>`;
+        });
+      }
     }
-  }
 
-  const allTags = Array.from(new Set((window.songs || []).flatMap(s => s.tags || [])));
-  const tagContainer = document.getElementById('tagFilterList');
-  const tagBadge = document.getElementById('selectedTagBadge');
-  
-  if (tagBadge) {
-    if (selectedTags.size > 0) {
-      tagBadge.textContent = selectedTags.size;
-      tagBadge.classList.remove('hidden');
-    } else {
-      tagBadge.classList.add('hidden');
+    const allTags = Array.from(new Set((window.songs || []).flatMap(s => s.tags || [])));
+    const tagContainer = document.getElementById('tagFilterList');
+    const tagBadge = document.getElementById('selectedTagBadge');
+    
+    if (tagBadge) {
+      if (selectedTags.size > 0) {
+        tagBadge.textContent = selectedTags.size;
+        tagBadge.classList.remove('hidden');
+      } else {
+        tagBadge.classList.add('hidden');
+      }
     }
-  }
 
-  if (tagContainer) {
-    tagContainer.innerHTML = '';
-    if (allTags.length > 0) {
-      allTags.forEach(tag => {
-        const isSelected = selectedTags.has(tag);
-        tagContainer.innerHTML += `
-          <button onclick="window.toggleTagFilter('${escapeHtml(tag)}')" class="px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 transition text-[11px] flex items-center gap-1 ${
-            isSelected ? 'bg-indigo-600 text-white font-bold shadow-sm' : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-white'
-          }">
-            <span>#${escapeHtml(tag)}</span>
-            ${isSelected ? '<span class="text-[9px]">✓</span>' : ''}
-          </button>
-        `;
-      });
-    }
-  }
-
-  const songCountEl = document.getElementById('songCount');
-  if (songCountEl) {
-    songCountEl.textContent = `登録曲: ${filtered.length}曲 / 全${(window.songs || []).length}曲`;
-  }
-
-  const listContainer = document.getElementById('songList');
-  if (!listContainer) return;
-
-  if (filtered.length === 0) {
-    listContainer.innerHTML = '<div class="text-center text-slate-500 py-12 text-sm">該当する曲がありません</div>';
-    return;
-  }
-
-  listContainer.innerHTML = filtered.map(s => {
-    const isPlaying = currentPlayingId === s.id;
-    const lyricsSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(s.title + ' ' + (s.artist || '') + ' 歌詞')}`;
-    const hasUndo = undoHistory[s.id] !== undefined;
-    const inSetlist = setlist.includes(s.id);
-    const isExpanded = expandedCardIds.has(s.id);
-
-    return `
-      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-sm transition overflow-hidden">
-        <div class="p-3 flex items-center gap-2.5">
-          ${s.artwork ? `
-            <img src="${s.artwork}" onclick="window.toggleExpandCard('${s.id}')" class="w-12 h-12 rounded-xl object-cover shrink-0 bg-slate-800 shadow border border-slate-800/80 cursor-pointer">
-          ` : `
-            <div onclick="window.toggleExpandCard('${s.id}')" class="w-12 h-12 rounded-xl bg-slate-800 border border-slate-800/80 flex items-center justify-center shrink-0 text-lg text-slate-600 cursor-pointer">🎵</div>
-          `}
-
-          <div class="min-w-0 flex-1 cursor-pointer" onclick="window.toggleExpandCard('${s.id}')">
-            <div class="flex items-center gap-1.5">
-              <div class="font-bold text-sm text-white truncate">${escapeHtml(s.title)}</div>
-              <span class="text-[10px] px-1.5 py-0.2 rounded font-mono font-bold whitespace-nowrap shrink-0 ${
-                s.key === '0' ? 'bg-slate-800 text-slate-300 border border-slate-700' :
-                (s.key || '').startsWith('+') ? 'bg-rose-950 text-rose-300 border border-rose-800' :
-                'bg-blue-950 text-blue-300 border border-blue-800'
-              }">${s.key === '0' ? '原曲' : 'キー ' + s.key}</span>
-            </div>
-
-            <div class="text-xs text-slate-400 truncate mt-0.5">${escapeHtml(s.artist) || '歌手未設定'}</div>
-
-            <div class="flex items-center gap-1 flex-wrap mt-1 text-[9px]">
-              <span class="px-1 py-0.2 rounded font-medium whitespace-nowrap ${
-                s.score === '得意' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/80' :
-                s.score === '歌える' ? 'bg-sky-950 text-sky-400 border border-sky-800/80' :
-                'bg-amber-950 text-amber-400 border border-amber-800/80'
-              }">${s.score}</span>
-              ${s.scoreVal ? `<span class="bg-amber-950/80 text-amber-300 px-1 py-0.2 rounded border border-amber-700/80 font-mono font-bold">🎯 ${s.scoreVal}点</span>` : ''}
-              ${s.singCount ? `<span class="bg-indigo-950/70 text-indigo-300 px-1 py-0.2 rounded border border-indigo-800/70 font-mono">🔥 ${s.singCount}回</span>` : ''}
-              ${s.duetType === 'duet' ? '<span class="bg-purple-950 text-purple-300 border border-purple-800">👥 デュエット</span>' : ''}
-            </div>
-          </div>
-
-          <div class="flex flex-col items-end gap-1 shrink-0">
-            <button onclick="${inSetlist ? `window.removeFromSetlist('${s.id}')` : `window.addToSetlist('${s.id}')`}" class="text-[11px] px-2.5 py-1 rounded-lg font-medium border transition whitespace-nowrap ${inSetlist ? 'bg-indigo-900/80 border-indigo-600 text-indigo-200' : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'}">
-              ${inSetlist ? '✓ セトリ中' : '＋ セトリ'}
+    if (tagContainer) {
+      tagContainer.innerHTML = '';
+      if (allTags.length > 0) {
+        allTags.forEach(tag => {
+          const isSelected = selectedTags.has(tag);
+          tagContainer.innerHTML += `
+            <button onclick="window.toggleTagFilter('${escapeHtml(tag)}')" class="px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 transition text-[11px] flex items-center gap-1 ${
+              isSelected ? 'bg-indigo-600 text-white font-bold shadow-sm' : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-white'
+            }">
+              <span>#${escapeHtml(tag)}</span>
+              ${isSelected ? '<span class="text-[9px]">✓</span>' : ''}
             </button>
-            <button onclick="window.toggleExpandCard('${s.id}')" class="text-slate-500 hover:text-slate-300 text-xs px-1 py-0.5 flex items-center gap-0.5">
-              <span class="text-[9px]">${isExpanded ? '閉じる' : '詳細'}</span>
-              <span>${isExpanded ? '▲' : '▼'}</span>
-            </button>
-          </div>
-        </div>
+          `;
+        });
+      }
+    }
 
-        ${isExpanded ? `
-          <div class="px-3.5 pb-3.5 pt-1 border-t border-slate-800/60 bg-slate-950/50 space-y-2.5">
-            <div class="flex items-center gap-1.5 flex-wrap text-[10px] text-slate-400">
-              ${s.year ? `<span class="bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 font-mono">${s.year}年</span>` : ''}
-              ${s.genre ? `<span class="bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">${escapeHtml(s.genre)}</span>` : ''}
-              ${s.maxPitch ? `<span class="bg-amber-950/60 text-amber-300 px-1.5 py-0.5 rounded border border-amber-800/60 font-mono">最高: ${escapeHtml(s.maxPitch)}</span>` : ''}
-              ${s.minPitch ? `<span class="bg-sky-950/60 text-sky-300 px-1.5 py-0.5 rounded border border-sky-800/60 font-mono">最低: ${escapeHtml(s.minPitch)}</span>` : ''}
-              ${s.duration ? `<span class="bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 font-mono">⏱️ ${s.duration}</span>` : ''}
-            </div>
+    const songCountEl = document.getElementById('songCount');
+    if (songCountEl) {
+      songCountEl.textContent = `登録曲: ${filtered.length}曲 / 全${(window.songs || []).length}曲`;
+    }
 
-            ${s.memo ? `<div class="text-xs text-slate-300 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800/80 leading-relaxed">${escapeHtml(s.memo)}</div>` : ''}
+    const listContainer = document.getElementById('songList');
+    if (!listContainer) return;
 
-            ${s.tags && s.tags.length ? `
-              <div class="flex flex-wrap gap-1">
-                ${s.tags.map(t => `<span class="text-[10px] bg-slate-900 text-slate-400 px-2 py-0.5 rounded-md border border-slate-800">#${escapeHtml(t)}</span>`).join('')}
+    if (filtered.length === 0) {
+      listContainer.innerHTML = '<div class="text-center text-slate-500 py-12 text-sm">該当する曲がありません</div>';
+      return;
+    }
+
+    listContainer.innerHTML = filtered.map(s => {
+      const isPlaying = currentPlayingId === s.id;
+      const lyricsSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(s.title + ' ' + (s.artist || '') + ' 歌詞')}`;
+      const hasUndo = undoHistory[s.id] !== undefined;
+      const inSetlist = setlist.includes(s.id);
+      const isExpanded = expandedCardIds.has(s.id);
+
+      return `
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-sm transition overflow-hidden">
+          <div class="p-3 flex items-center gap-2.5">
+            ${s.artwork ? `
+              <img src="${s.artwork}" onclick="window.toggleExpandCard('${s.id}')" class="w-12 h-12 rounded-xl object-cover shrink-0 bg-slate-800 shadow border border-slate-800/80 cursor-pointer">
+            ` : `
+              <div onclick="window.toggleExpandCard('${s.id}')" class="w-12 h-12 rounded-xl bg-slate-800 border border-slate-800/80 flex items-center justify-center shrink-0 text-lg text-slate-600 cursor-pointer">🎵</div>
+            `}
+
+            <div class="min-w-0 flex-1 cursor-pointer" onclick="window.toggleExpandCard('${s.id}')">
+              <div class="flex items-center gap-1.5">
+                <div class="font-bold text-sm text-white truncate">${escapeHtml(s.title)}</div>
+                <span class="text-[10px] px-1.5 py-0.2 rounded font-mono font-bold whitespace-nowrap shrink-0 ${
+                  s.key === '0' ? 'bg-slate-800 text-slate-300 border border-slate-700' :
+                  (s.key || '').startsWith('+') ? 'bg-rose-950 text-rose-300 border border-rose-800' :
+                  'bg-blue-950 text-blue-300 border border-blue-800'
+                }">${s.key === '0' ? '原曲' : 'キー ' + s.key}</span>
               </div>
-            ` : ''}
 
-            <div class="flex items-center justify-between pt-1 gap-1 text-[11px] overflow-x-auto no-scrollbar">
-              <div class="flex items-center gap-1.5 shrink-0">
-                <button onclick="window.recordSung('${s.id}')" class="text-indigo-300 hover:text-white bg-indigo-900/60 hover:bg-indigo-900 border border-indigo-700/60 px-2.5 py-1 rounded-lg font-medium transition whitespace-nowrap">
-                  🎤 歌った！
-                </button>
-                ${hasUndo ? `
-                  <button onclick="window.undoSung('${s.id}')" class="text-amber-400 hover:text-amber-300 bg-amber-950/60 border border-amber-800/80 px-1.5 py-1 rounded-lg font-medium text-[10px] whitespace-nowrap">
-                    ↩ 取消
+              <div class="text-xs text-slate-400 truncate mt-0.5">${escapeHtml(s.artist) || '歌手未設定'}</div>
+
+              <div class="flex items-center gap-1 flex-wrap mt-1 text-[9px]">
+                <span class="px-1 py-0.2 rounded font-medium whitespace-nowrap ${
+                  s.score === '得意' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/80' :
+                  s.score === '歌える' ? 'bg-sky-950 text-sky-400 border border-sky-800/80' :
+                  'bg-amber-950 text-amber-400 border border-amber-800/80'
+                }">${s.score}</span>
+                ${s.scoreVal ? `<span class="bg-amber-950/80 text-amber-300 px-1 py-0.2 rounded border border-amber-700/80 font-mono font-bold">🎯 ${s.scoreVal}点</span>` : ''}
+                ${s.singCount ? `<span class="bg-indigo-950/70 text-indigo-300 px-1 py-0.2 rounded border border-indigo-800/70 font-mono">🔥 ${s.singCount}回</span>` : ''}
+                ${s.duetType === 'duet' ? '<span class="bg-purple-950 text-purple-300 border border-purple-800">👥 デュエット</span>' : ''}
+              </div>
+            </div>
+
+            <div class="flex flex-col items-end gap-1 shrink-0">
+              <button onclick="${inSetlist ? `window.removeFromSetlist('${s.id}')` : `window.addToSetlist('${s.id}')`}" class="text-[11px] px-2.5 py-1 rounded-lg font-medium border transition whitespace-nowrap ${inSetlist ? 'bg-indigo-900/80 border-indigo-600 text-indigo-200' : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'}">
+                ${inSetlist ? '✓ セトリ中' : '＋ セトリ'}
+              </button>
+              <button onclick="window.toggleExpandCard('${s.id}')" class="text-slate-500 hover:text-slate-300 text-xs px-1 py-0.5 flex items-center gap-0.5">
+                <span class="text-[9px]">${isExpanded ? '閉じる' : '詳細'}</span>
+                <span>${isExpanded ? '▲' : '▼'}</span>
+              </button>
+            </div>
+          </div>
+
+          ${isExpanded ? `
+            <div class="px-3.5 pb-3.5 pt-1 border-t border-slate-800/60 bg-slate-950/50 space-y-2.5">
+              <div class="flex items-center gap-1.5 flex-wrap text-[10px] text-slate-400">
+                ${s.year ? `<span class="bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 font-mono">${s.year}年</span>` : ''}
+                ${s.genre ? `<span class="bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">${escapeHtml(s.genre)}</span>` : ''}
+                ${s.maxPitch ? `<span class="bg-amber-950/60 text-amber-300 px-1.5 py-0.5 rounded border border-amber-800/60 font-mono">最高: ${escapeHtml(s.maxPitch)}</span>` : ''}
+                ${s.minPitch ? `<span class="bg-sky-950/60 text-sky-300 px-1.5 py-0.5 rounded border border-sky-800/60 font-mono">最低: ${escapeHtml(s.minPitch)}</span>` : ''}
+                ${s.duration ? `<span class="bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 font-mono">⏱️ ${s.duration}</span>` : ''}
+              </div>
+
+              ${s.memo ? `<div class="text-xs text-slate-300 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800/80 leading-relaxed">${escapeHtml(s.memo)}</div>` : ''}
+
+              ${s.tags && s.tags.length ? `
+                <div class="flex flex-wrap gap-1">
+                  ${s.tags.map(t => `<span class="text-[10px] bg-slate-900 text-slate-400 px-2 py-0.5 rounded-md border border-slate-800">#${escapeHtml(t)}</span>`).join('')}
+                </div>
+              ` : ''}
+
+              <div class="flex items-center justify-between pt-1 gap-1 text-[11px] overflow-x-auto no-scrollbar">
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <button onclick="window.recordSung('${s.id}')" class="text-indigo-300 hover:text-white bg-indigo-900/60 hover:bg-indigo-900 border border-indigo-700/60 px-2.5 py-1 rounded-lg font-medium transition whitespace-nowrap">
+                    🎤 歌った！
                   </button>
-                ` : ''}
-              </div>
+                  ${hasUndo ? `
+                    <button onclick="window.undoSung('${s.id}')" class="text-amber-400 hover:text-amber-300 bg-amber-950/60 border border-amber-800/80 px-1.5 py-1 rounded-lg font-medium text-[10px] whitespace-nowrap">
+                      ↩ 取消
+                    </button>
+                  ` : ''}
+                </div>
 
-              <div class="flex items-center gap-1 shrink-0">
-                <button onclick="window.togglePlayPreview('${s.previewUrl \vert{}\vert{} ''}', '${s.id}', '${escapeHtml(s.title)}', '${escapeHtml(s.artist)}')" class="px-2 py-1 rounded-lg font-medium border flex items-center gap-1 whitespace-nowrap ${isPlaying ? 'bg-rose-900 border-rose-700 text-rose-200' : 'bg-slate-800 border-slate-700 text-slate-300'}">
-                  ${isPlaying ? '⏹ 停止' : '▶ 試聴'}
-                </button>
-                <a href="${lyricsSearchUrl}" target="_blank" rel="noopener" class="text-slate-400 hover:text-sky-400 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700 flex items-center gap-1 whitespace-nowrap">
-                  📄 歌詞
-                </a>
-                <a href="https://www.youtube.com/results?search_query=${encodeURIComponent((s.artist ? s.artist + ' ' : '') + s.title)}" target="_blank" rel="noopener" class="text-slate-400 hover:text-red-400 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700 flex items-center gap-1 whitespace-nowrap">
-                  ▶️ YT
-                </a>
-                <button onclick="window.openEditModal('${s.id}')" class="text-slate-400 hover:text-indigo-400 bg-slate-800 border border-slate-700 p-1 rounded-lg text-xs" title="編集">✏️</button>
-                <button onclick="window.deleteSong('${s.id}')" class="text-slate-500 hover:text-rose-400 bg-slate-800 border border-slate-700 p-1 rounded-lg text-xs" title="削除">🗑️</button>
+                <div class="flex items-center gap-1 shrink-0">
+                  <button onclick="window.togglePlayPreview('${s.previewUrl \vert{}\vert{} ''}', '${s.id}', '${escapeHtml(s.title)}', '${escapeHtml(s.artist)}')" class="px-2 py-1 rounded-lg font-medium border flex items-center gap-1 whitespace-nowrap ${isPlaying ? 'bg-rose-900 border-rose-700 text-rose-200' : 'bg-slate-800 border-slate-700 text-slate-300'}">
+                    ${isPlaying ? '⏹ 停止' : '▶ 試聴'}
+                  </button>
+                  <a href="${lyricsSearchUrl}" target="_blank" rel="noopener" class="text-slate-400 hover:text-sky-400 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700 flex items-center gap-1 whitespace-nowrap">
+                    📄 歌詞
+                  </a>
+                  <a href="https://www.youtube.com/results?search_query=${encodeURIComponent((s.artist ? s.artist + ' ' : '') + s.title)}" target="_blank" rel="noopener" class="text-slate-400 hover:text-red-400 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700 flex items-center gap-1 whitespace-nowrap">
+                    ▶️ YT
+                  </a>
+                  <button onclick="window.openEditModal('${s.id}')" class="text-slate-400 hover:text-indigo-400 bg-slate-800 border border-slate-700 p-1 rounded-lg text-xs" title="編集">✏️</button>
+                  <button onclick="window.deleteSong('${s.id}')" class="text-slate-500 hover:text-rose-400 bg-slate-800 border border-slate-700 p-1 rounded-lg text-xs" title="削除">🗑️</button>
+                </div>
               </div>
             </div>
-          </div>
-        ` : ''}
-      </div>
-    `;
-  }).join('');
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error("Critical Render Error:", err);
+  }
 };
 
 window.toggleTagFilter = function(tag) {
@@ -1205,16 +1211,18 @@ window.toggleTagFilter = function(tag) {
 window.clearSelectedTags = function() { selectedTags.clear(); window.render(); };
 window.setTagFilterMode = function(mode) {
   tagFilterMode = mode;
-  document.getElementById('tagModeAnd').className = mode === 'AND' ? "px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-600 text-white" : "px-1.5 py-0.5 rounded text-[9px] text-slate-400 hover:text-white";
-  document.getElementById('tagModeOr').className = mode === 'OR' ? "px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-600 text-white" : "px-1.5 py-0.5 rounded text-[9px] text-slate-400 hover:text-white";
+  const btnAnd = document.getElementById('tagModeAnd');
+  const btnOr = document.getElementById('tagModeOr');
+  if (btnAnd) btnAnd.className = mode === 'AND' ? "px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-600 text-white" : "px-1.5 py-0.5 rounded text-[9px] text-slate-400 hover:text-white";
+  if (btnOr) btnOr.className = mode === 'OR' ? "px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-600 text-white" : "px-1.5 py-0.5 rounded text-[9px] text-slate-400 hover:text-white";
   window.render();
 };
 window.setScoreFilter = function(score) {
   selectedScore = score;
   document.querySelectorAll('.score-tab').forEach(b => {
     b.className = b.dataset.val === score 
-      ? 'score-tab px-2 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0' 
-      : 'score-tab px-2 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0';
+      ? 'score-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0 text-xs' 
+      : 'score-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0 text-xs';
   });
   window.render();
 };
@@ -1424,10 +1432,12 @@ window.closeRandom = function() {
   document.getElementById('randomBanner').classList.add('hidden');
 };
 
-// 初期マウント実行
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => { window.render(); window.renderSetlist(); });
-} else {
+// Firestoreデータ受信通知イベントを受け取って再描画
+window.addEventListener('firestoreDataLoaded', () => {
   window.render();
   window.renderSetlist();
-}
+});
+
+// 初期実行
+window.render();
+window.renderSetlist();
