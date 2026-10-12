@@ -42,44 +42,49 @@ const TIE_UP_PRESETS = [
   { title: 'ミュージック・アワー', artist: 'ポルノグラフィティ', year: '2000', tieUp: '🥤 ポカリスエットCMソング' }
 ];
 
-// iTunes API 呼び出し（fetch失敗時はJSONPで確実に取得）
-async function fetchITunesApi(url) {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
-  } catch (err) {
-    // CORSやネットワーク制限対策のJSONPフォールバック
-    return new Promise((resolve, reject) => {
-      const cbName = 'itunes_cb_' + Math.random().toString(36).substring(2, 9);
-      const sep = url.includes('?') ? '&' : '?';
-      const script = document.createElement('script');
-      script.src = `${url}${sep}callback=${cbName}`;
-      
-      const timeout = setTimeout(() => {
-        cleanup();
-        reject(new Error("通信タイムアウト"));
-      }, 8000);
+// iTunes API 呼び出し（fetch失敗時は動的スクリプトタグによるJSONPで確実に取得）
+function fetchITunesApi(term, limit = 1) {
+  const cleanTerm = encodeURIComponent(term.trim());
+  const apiUrl = `https://itunes.apple.com/search?term=${cleanTerm}&country=jp&entity=song&limit=${limit}`;
 
-      function cleanup() {
-        clearTimeout(timeout);
-        delete window[cbName];
-        if (script.parentNode) script.parentNode.removeChild(script);
-      }
+  return new Promise((resolve, reject) => {
+    // 1. 通常fetch試行
+    fetch(apiUrl)
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then(data => resolve(data))
+      .catch(() => {
+        // 2. fetchがブロックされた場合のJSONPフォールバック
+        const cbName = 'itunes_jsonp_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+        const script = document.createElement('script');
+        script.src = `${apiUrl}&callback=${cbName}`;
 
-      window[cbName] = (data) => {
-        cleanup();
-        resolve(data);
-      };
+        const timer = setTimeout(() => {
+          cleanup();
+          reject(new Error("通信がタイムアウトしました。"));
+        }, 10000);
 
-      script.onerror = () => {
-        cleanup();
-        reject(new Error("iTunes API接続に失敗しました"));
-      };
+        function cleanup() {
+          clearTimeout(timer);
+          delete window[cbName];
+          if (script.parentNode) script.parentNode.removeChild(script);
+        }
 
-      document.body.appendChild(script);
-    });
-  }
+        window[cbName] = (data) => {
+          cleanup();
+          resolve(data);
+        };
+
+        script.onerror = () => {
+          cleanup();
+          reject(new Error("iTunesサーバーに接続できませんでした。"));
+        };
+
+        document.head.appendChild(script);
+      });
+  });
 }
 
 function saveSetlist() {
@@ -149,7 +154,7 @@ window.processBulkSearch = async function() {
     progressEl.textContent = `⏳ iTunesで検索中 (${i + 1}/${rawLines.length}): ${cleanedTerm}`;
 
     try {
-      const data = await fetchITunesApi(`https://itunes.apple.com/search?term=${encodeURIComponent(cleanedTerm)}&country=jp&entity=song&limit=1`);
+      const data = await fetchITunesApi(cleanedTerm, 1);
 
       if (data.results && data.results.length > 0) {
         const item = data.results[0];
@@ -334,7 +339,7 @@ window.reSearchSingleBulkCandidate = async function(idx) {
   if (!term) return alert("検索キーワードを入力してください。");
 
   try {
-    const data = await fetchITunesApi(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=jp&entity=song&limit=1`);
+    const data = await fetchITunesApi(term, 1);
     if (data.results && data.results.length > 0) {
       const item = data.results[0];
       const year = item.releaseDate ? item.releaseDate.substring(0, 4) : '';
@@ -434,7 +439,7 @@ window.startDataMigration = async function() {
     const s = targets[i];
     progressEl.textContent = `⏳ 補完処理中 (${i + 1}/${targets.length}): ${s.title}`;
     try {
-      const data = await fetchITunesApi(`https://itunes.apple.com/search?term=${encodeURIComponent((s.title + ' ' + (s.artist || '')).trim())}&country=jp&entity=song&limit=1`);
+      const data = await fetchITunesApi((s.title + ' ' + (s.artist || '')).trim(), 1);
       if (data.results && data.results.length > 0) {
         const hit = data.results[0];
         const patch = {};
@@ -555,8 +560,10 @@ window.togglePlayPreview = async function(url, id, trackName = '', artistName = 
   let playableUrl = url;
   if (!playableUrl && (trackId || (trackName && artistName))) {
     try {
-      const q = trackId ? `https://itunes.apple.com/lookup?id=${trackId}&country=jp` : `https://itunes.apple.com/search?term=${encodeURIComponent(trackName + ' ' + artistName)}&country=jp&entity=song&limit=1`;
-      const data = await fetchITunesApi(q);
+      const q = trackId ? `https://itunes.apple.com/lookup?id=${trackId}&country=jp` : `${trackName} ${artistName}`;
+      const data = trackId 
+        ? await fetch(`https://itunes.apple.com/lookup?id=${trackId}&country=jp`).then(r => r.json())
+        : await fetchITunesApi(q, 1);
       if (data.results && data.results.length > 0 && data.results[0].previewUrl) {
         playableUrl = data.results[0].previewUrl;
       }
@@ -696,7 +703,7 @@ window.analyzeAndRecommend = async function() {
 
   for (const artist of topArtists.slice(0, 2)) {
     try {
-      const data = await fetchITunesApi(`https://itunes.apple.com/search?term=${encodeURIComponent(artist)}&country=jp&entity=song&limit=10`);
+      const data = await fetchITunesApi(artist, 10);
       (data.results || []).forEach(item => {
         if (!myTitles.has((item.trackName || '').toLowerCase().replace(/\s+/g, ''))) {
           fetchedCandidates.push({
@@ -716,7 +723,7 @@ window.analyzeAndRecommend = async function() {
 
   for (const rArtist of relatedArtists.slice(0, 2)) {
     try {
-      const data = await fetchITunesApi(`https://itunes.apple.com/search?term=${encodeURIComponent(rArtist)}&country=jp&entity=song&limit=5`);
+      const data = await fetchITunesApi(rArtist, 5);
       (data.results || []).forEach(item => {
         if (!myTitles.has((item.trackName || '').toLowerCase().replace(/\s+/g, ''))) {
           fetchedCandidates.push({
@@ -814,7 +821,7 @@ window.searchITunes = async function() {
   resultBox.innerHTML = '<div class="text-[11px] text-slate-500 py-1">50件取得中...</div>';
 
   try {
-    const data = await fetchITunesApi(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=jp&entity=song&limit=50`);
+    const data = await fetchITunesApi(term, 50);
     if (!data.results || data.results.length === 0) return resultBox.innerHTML = '<div class="text-[11px] text-slate-500 py-1">曲が見つかりませんでした</div>';
 
     currentRawITunesResults = data.results.map(item => {
