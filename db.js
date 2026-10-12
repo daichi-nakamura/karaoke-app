@@ -41,12 +41,13 @@ try {
 
       if (typeof window.render === 'function') {
         window.render();
-      } else {
-        const countEl = document.getElementById('songCount');
-        if (countEl) countEl.textContent = `登録曲: ${window.songs.length}曲`;
+      }
+      if (typeof window.renderSetlist === 'function') {
+        window.renderSetlist();
       }
 
-      if (typeof window.renderSetlist === 'function') window.renderSetlist();
+      // app.jsに通知
+      window.dispatchEvent(new CustomEvent('firestoreDataLoaded'));
     }, (err) => {
       console.error("Firestore Error:", err);
       showStatus("⚠️ Firestore通信エラー: " + err.message, true);
