@@ -102,7 +102,7 @@
       <div id="tagFilterList" class="flex gap-1.5 overflow-x-auto no-scrollbar text-xs pt-1"></div>
     </div>
 
-    <!-- 完成度フィルター（独立段にして被りを解消） -->
+    <!-- 完成度 & 全展開/並び順（2段構成） -->
     <div class="space-y-1.5 pt-1">
       <div class="flex gap-1 overflow-x-auto no-scrollbar py-0.5" id="scoreTabs">
         <button onclick="window.setScoreFilter('all')" class="score-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0 text-xs" data-val="all">すべて</button>
@@ -111,9 +111,8 @@
         <button onclick="window.setScoreFilter('練習中')" class="score-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0 text-xs" data-val="練習中">練習中</button>
       </div>
 
-      <!-- 全展開 & 並び順切り替え -->
       <div class="flex items-center justify-between gap-1.5 text-xs">
-        <button id="btnToggleAllExpand" onclick="window.toggleAllExpand()" class="bg-slate-900 hover:bg-slate-800 border border-slate-800 px-2.5 py-1.5 rounded-lg text-slate-300 text-[11px] whitespace-nowrap transition flex items-center gap-1 shrink-0" title="全曲の詳細表示/コンパクト表示を切り替え">
+        <button id="btnToggleAllExpand" onclick="window.toggleAllExpand()" class="bg-slate-900 hover:bg-slate-800 border border-slate-800 px-2.5 py-1.5 rounded-lg text-slate-300 text-[11px] whitespace-nowrap transition flex items-center gap-1 shrink-0">
           <span id="toggleAllExpandIcon">📖</span>
           <span id="toggleAllExpandText">全展開</span>
         </button>
@@ -331,11 +330,11 @@
           <div class="grid grid-cols-2 gap-2 bg-slate-950/60 p-2 rounded-xl border border-slate-800/80">
             <div>
               <label class="block text-[11px] text-amber-400 mb-1">🔥 最高音</label>
-              <input type="text" id="formMaxPitch" placeholder="例: hiA, mid2G" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-500">
+              <input type="text" id="formMaxPitch" placeholder="例: hiA, mid2G" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-500">
             </div>
             <div>
               <label class="block text-[11px] text-sky-400 mb-1">💧 最低音</label>
-              <input type="text" id="formMinPitch" placeholder="例: mid1D, lowG" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-sky-500">
+              <input type="text" id="formMinPitch" placeholder="例: mid1D, lowG" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-sky-500">
             </div>
           </div>
 
@@ -442,7 +441,7 @@
     </div>
   </div>
 
-  <script src="./app.js"></script>
-  <script type="module" src="./db.js"></script>
+  <!-- 単一のモジュールとして読み込み、競合をゼロにする -->
+  <script type="module" src="./main.js"></script>
 </body>
 </html>
