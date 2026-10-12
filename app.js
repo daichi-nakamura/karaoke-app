@@ -42,7 +42,6 @@ const TIE_UP_PRESETS = [
   { title: 'ミュージック・アワー', artist: 'ポルノグラフィティ', year: '2000', tieUp: '🥤 ポカリスエットCMソング' }
 ];
 
-// iTunes API 呼び出し（fetch失敗時は動的スクリプトタグによるJSONPで確実に取得）
 function fetchITunesApi(term, limit = 1) {
   const cleanTerm = encodeURIComponent(term.trim());
   const apiUrl = `https://itunes.apple.com/search?term=${cleanTerm}&country=jp&entity=song&limit=${limit}`;
@@ -186,6 +185,7 @@ window.processBulkSearch = async function() {
           tags: tags,
           isAlreadyAdded: isAlreadyAdded,
           isEditing: false,
+          searchKeyword: `${item.trackName} ${item.artistName}`,
           reSearchResults: []
         });
       } else {
@@ -206,6 +206,7 @@ window.processBulkSearch = async function() {
           isAlreadyAdded: false,
           notFound: true,
           isEditing: false,
+          searchKeyword: cleanedTerm,
           reSearchResults: []
         });
       }
@@ -309,7 +310,7 @@ function renderBulkPreview() {
           <div class="pt-1.5 border-t border-slate-800">
             <div class="text-[9px] text-indigo-400 font-semibold mb-1">🔍 iTunesから再検索して選択差し替え</div>
             <div class="flex gap-1">
-              <input type="text" id="reSearchInput_${idx}" onkeydown="if(event.key==='Enter'){event.preventDefault(); reSearchSingleBulkCandidate(${idx});}" placeholder="歌手名や曲名を入力..." value="${escapeHtml((s.title || '') + ' ' + (s.artist || ''))}" class="flex-1 bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[10px] text-white focus:outline-none focus:border-indigo-500">
+              <input type="text" id="reSearchInput_${idx}" oninput="updateSearchKeyword(${idx}, this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault(); reSearchSingleBulkCandidate(${idx});}" placeholder="歌手名や曲名を入力..." value="${escapeHtml(s.searchKeyword !== undefined ? s.searchKeyword : ((s.title || '') + ' ' + (s.artist || '')))}" class="flex-1 bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[10px] text-white focus:outline-none focus:border-indigo-500">
               <button type="button" onclick="reSearchSingleBulkCandidate(${idx})" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded text-[10px] font-semibold whitespace-nowrap">再検索</button>
             </div>
 
@@ -339,10 +340,17 @@ function renderBulkPreview() {
   `).join('');
 }
 
+window.updateSearchKeyword = function(idx, val) {
+  if (!bulkCandidateSongs[idx]) return;
+  bulkCandidateSongs[idx].searchKeyword = val;
+};
+
 window.toggleEditBulkCandidate = function(idx) {
   bulkCandidateSongs[idx].isEditing = !bulkCandidateSongs[idx].isEditing;
   if (!bulkCandidateSongs[idx].isEditing) {
     bulkCandidateSongs[idx].reSearchResults = [];
+  } else if (bulkCandidateSongs[idx].searchKeyword === undefined) {
+    bulkCandidateSongs[idx].searchKeyword = `${bulkCandidateSongs[idx].title || ''} ${bulkCandidateSongs[idx].artist || ''}`.trim();
   }
   renderBulkPreview();
 };
@@ -357,11 +365,12 @@ window.updateBulkCandidateField = function(idx, field, val) {
   }
 };
 
-// 一括登録用の単曲検索と同じ候補取得
 window.reSearchSingleBulkCandidate = async function(idx) {
   const inputEl = document.getElementById(`reSearchInput_${idx}`);
   const term = inputEl ? inputEl.value.trim() : '';
   if (!term) return alert("検索キーワードを入力してください。");
+
+  bulkCandidateSongs[idx].searchKeyword = term;
 
   const resultsBox = document.getElementById(`reSearchResults_${idx}`);
   if (resultsBox) {
@@ -401,7 +410,6 @@ window.reSearchSingleBulkCandidate = async function(idx) {
   }
 };
 
-// 候補一覧から曲をタップして反映（編集画面は開いたまま維持）
 window.applyITunesSongToCandidate = function(idx, encoded) {
   const item = JSON.parse(decodeURIComponent(encoded));
   if (!bulkCandidateSongs[idx]) return;
@@ -420,8 +428,7 @@ window.applyITunesSongToCandidate = function(idx, encoded) {
   bulkCandidateSongs[idx].duetType = item.isDuet ? 'duet' : 'solo';
   bulkCandidateSongs[idx].isAlreadyAdded = isAlreadyAdded;
   bulkCandidateSongs[idx].notFound = false;
-  bulkCandidateSongs[idx].reSearchResults = []; // リストを閉じる
-  // isEditingはtrueのまま維持してユーザーが確認・微調整できるようにする
+  bulkCandidateSongs[idx].reSearchResults = [];
 
   renderBulkPreview();
 };
@@ -1060,15 +1067,8 @@ window.toggleAllExpand = function() {
 
 function updateToggleAllExpandButtonState() {
   const icon = document.getElementById('toggleAllExpandIcon');
-  const text = document.getElementById('toggleAllExpandText');
-  if (!icon || !text) return;
-  if (isAllExpanded) {
-    icon.textContent = '📕';
-    text.textContent = '全折畳';
-  } else {
-    icon.textContent = '📖';
-    text.textContent = '全展開';
-  }
+  if (!icon) return;
+  icon.textContent = isAllExpanded ? '📕' : '📖';
 }
 
 function getCurrentFilteredSongs() {
@@ -1131,9 +1131,9 @@ window.render = function() {
   if (genreContainer) {
     genreContainer.innerHTML = '';
     if (allGenres.length > 0) {
-      genreContainer.innerHTML += `<button onclick="setFilterGenre(null)" class="px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 transition ${selectedGenre === null ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">全ジャンル</button>`;
+      genreContainer.innerHTML += `<button onclick="setFilterGenre(null)" class="px-2.5 py-1 rounded-lg whitespace-nowrap shrink-0 transition ${selectedGenre === null ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">全ジャンル</button>`;
       allGenres.forEach(g => {
-        genreContainer.innerHTML += `<button onclick="setFilterGenre('${g}')" class="px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 transition ${selectedGenre === g ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">${escapeHtml(g)}</button>`;
+        genreContainer.innerHTML += `<button onclick="setFilterGenre('${g}')" class="px-2.5 py-1 rounded-lg whitespace-nowrap shrink-0 transition ${selectedGenre === g ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">${escapeHtml(g)}</button>`;
       });
     }
   }
@@ -1323,8 +1323,8 @@ window.setAttrFilter = function(attr) {
   selectedAttr = attr;
   document.querySelectorAll('.attr-tab').forEach(b => {
     b.className = b.dataset.val === attr 
-      ? 'attr-tab px-2 py-0.5 rounded-md bg-slate-800 text-white font-medium whitespace-nowrap shrink-0' 
-      : 'attr-tab px-2 py-0.5 rounded-md bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0';
+      ? 'attr-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0' 
+      : 'attr-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0';
   });
   render();
 };
