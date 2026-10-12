@@ -38,7 +38,14 @@ try {
       window.songs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       const banner = document.getElementById('statusBanner');
       if (banner) banner.classList.add('hidden');
-      if (typeof window.render === 'function') window.render();
+
+      if (typeof window.render === 'function') {
+        window.render();
+      } else {
+        const countEl = document.getElementById('songCount');
+        if (countEl) countEl.textContent = `登録曲: ${window.songs.length}曲`;
+      }
+
       if (typeof window.renderSetlist === 'function') window.renderSetlist();
     }, (err) => {
       console.error("Firestore Error:", err);
