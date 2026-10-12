@@ -76,6 +76,14 @@ window.switchModalTab = function(mode) {
   }
 };
 
+window.cycleCandidateScore = function(idx) {
+  if (!bulkCandidateSongs[idx]) return;
+  const loop = { '練習中': '歌える', '歌える': '得意', '得意': '練習中' };
+  const current = bulkCandidateSongs[idx].score || '練習中';
+  bulkCandidateSongs[idx].score = loop[current] || '練習中';
+  renderBulkPreview();
+};
+
 window.processBulkSearch = async function() {
   const rawText = document.getElementById('bulkTextInput').value.trim();
   if (!rawText) return alert("曲名を入力または貼り付けてください。");
@@ -131,7 +139,7 @@ window.processBulkSearch = async function() {
           duration: item.trackTimeMillis ? `${mins}:${secs}` : '',
           durationMs: item.trackTimeMillis || 0,
           key: '0',
-          score: '歌える',
+          score: '練習中',
           duetType: isDuet ? 'duet' : 'solo',
           tags: tags,
           isAlreadyAdded: isAlreadyAdded,
@@ -149,7 +157,7 @@ window.processBulkSearch = async function() {
           duration: '',
           durationMs: 0,
           key: '0',
-          score: '歌える',
+          score: '練習中',
           duetType: 'solo',
           tags: [],
           isAlreadyAdded: false,
@@ -201,7 +209,9 @@ function renderBulkPreview() {
           <div class="font-bold text-white truncate flex items-center gap-1.5">
             <span>${escapeHtml(s.title)}</span>
             ${s.key !== '0' ? `<span class="text-[9px] bg-slate-800 text-indigo-300 border border-slate-700 px-1 rounded font-mono">${s.key}</span>` : ''}
-            <span class="text-[9px] px-1 rounded ${s.score === '得意' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : s.score === '歌える' ? 'bg-sky-950 text-sky-300 border border-sky-800' : 'bg-amber-950 text-amber-300 border border-amber-800'}">${s.score}</span>
+            <button type="button" onclick="cycleCandidateScore(${idx})" title="タップで完成度を変更" class="text-[9px] px-1.5 py-0.2 rounded cursor-pointer transition active:scale-95 ${s.score === '得意' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900' : s.score === '歌える' ? 'bg-sky-950 text-sky-300 border border-sky-800 hover:bg-sky-900' : 'bg-amber-950 text-amber-300 border border-amber-800 hover:bg-amber-900'}">
+              ${s.score} 🔄
+            </button>
             ${s.duetType === 'duet' ? '<span class="text-[9px] bg-purple-950 text-purple-300 border border-purple-800 px-1 rounded whitespace-nowrap">デュエット</span>' : ''}
             ${s.isAlreadyAdded ? '<span class="text-[9px] bg-slate-800 text-slate-400 border border-slate-700 px-1 rounded whitespace-nowrap">登録済</span>' : ''}
             ${s.notFound ? '<span class="text-[9px] bg-amber-950 text-amber-400 border border-amber-800 px-1 rounded whitespace-nowrap">情報なし</span>' : ''}
@@ -280,8 +290,9 @@ window.updateBulkCandidateField = function(idx, field, val) {
 };
 
 window.reSearchSingleBulkCandidate = async function(idx) {
-  const term = document.getElementById(`reSearchInput_${idx}`).value.trim();
-  if (!term) return;
+  const inputEl = document.getElementById(`reSearchInput_${idx}`);
+  const term = inputEl ? inputEl.value.trim() : '';
+  if (!term) return alert("検索キーワードを入力してください。");
 
   try {
     const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=jp&entity=song&limit=1`);
@@ -310,7 +321,7 @@ window.reSearchSingleBulkCandidate = async function(idx) {
       bulkCandidateSongs[idx].isEditing = false;
       renderBulkPreview();
     } else {
-      alert("該当する曲が見つかりませんでした。");
+      alert("該当する曲が見つかりませんでした。別のキーワードでお試しください。");
     }
   } catch (e) {
     alert("検索エラーが発生しました。");
@@ -344,7 +355,7 @@ window.saveBulkSongs = async function() {
       scoreVal: null,
       duetType: s.duetType || 'solo',
       key: s.key || '0',
-      score: s.score || '歌える',
+      score: s.score || '練習中',
       tags: s.tags || [],
       memo: '',
       singCount: 0,
@@ -1115,14 +1126,23 @@ window.render = function() {
             </div>
           </div>
 
-          <div class="flex flex-col items-end gap-1 shrink-0">
-            <button onclick="${inSetlist ? `removeFromSetlist('${s.id}')` : `addToSetlist('${s.id}')`}" class="text-[11px] px-2.5 py-1 rounded-lg font-medium border transition whitespace-nowrap ${inSetlist ? 'bg-indigo-900/80 border-indigo-600 text-indigo-200' : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'}">
-              ${inSetlist ? '✓ セトリ中' : '＋ セトリ'}
-            </button>
-            <button onclick="toggleExpandCard('${s.id}')" class="text-slate-500 hover:text-slate-300 text-xs px-1 py-0.5 flex items-center gap-0.5">
-              <span class="text-[9px]">${isExpanded ? '閉じる' : '詳細'}</span>
-              <span>${isExpanded ? '▲' : '▼'}</span>
-            </button>
+          <div class="flex flex-col items-end gap-1.5 shrink-0">
+            <div class="flex items-center gap-1">
+              <button onclick="recordSung('${s.id}')" title="歌った！" class="text-indigo-200 bg-indigo-900/80 hover:bg-indigo-800 border border-indigo-700/80 px-2 py-1 rounded-lg font-bold text-[10px] whitespace-nowrap">
+                🎤 歌った
+              </button>
+              <button onclick="openEditModal('${s.id}')" title="編集" class="text-slate-400 hover:text-indigo-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 p-1 rounded-lg text-xs">
+                ✏️
+              </button>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="${inSetlist ? `removeFromSetlist('${s.id}')` : `addToSetlist('${s.id}')`}" class="text-[10px] px-2 py-0.5 rounded-md font-medium border transition whitespace-nowrap ${inSetlist ? 'bg-indigo-950 border-indigo-600 text-indigo-300' : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'}">
+                ${inSetlist ? '✓ セトリ' : '＋ セトリ'}
+              </button>
+              <button onclick="toggleExpandCard('${s.id}')" class="text-slate-500 hover:text-slate-300 text-xs px-1 py-0.5">
+                <span>${isExpanded ? '▲' : '▼'}</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1146,12 +1166,9 @@ window.render = function() {
 
             <div class="flex items-center justify-between pt-1 gap-1 text-[11px] overflow-x-auto no-scrollbar">
               <div class="flex items-center gap-1.5 shrink-0">
-                <button onclick="recordSung('${s.id}')" class="text-indigo-300 hover:text-white bg-indigo-900/60 hover:bg-indigo-900 border border-indigo-700/60 px-2.5 py-1 rounded-lg font-medium transition whitespace-nowrap">
-                  🎤 歌った！
-                </button>
                 ${hasUndo ? `
-                  <button onclick="undoSung('${s.id}')" class="text-amber-400 hover:text-amber-300 bg-amber-950/60 border border-amber-800/80 px-1.5 py-1 rounded-lg font-medium text-[10px] whitespace-nowrap">
-                    ↩ 取消
+                  <button onclick="undoSung('${s.id}')" class="text-amber-400 hover:text-amber-300 bg-amber-950/60 border border-amber-800/80 px-2 py-1 rounded-lg font-medium text-[10px] whitespace-nowrap">
+                    ↩ 歌唱取消
                   </button>
                 ` : ''}
               </div>
@@ -1166,7 +1183,6 @@ window.render = function() {
                 <a href="https://www.youtube.com/results?search_query=${encodeURIComponent((s.artist ? s.artist + ' ' : '') + s.title)}" target="_blank" rel="noopener" class="text-slate-400 hover:text-red-400 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700 flex items-center gap-1 whitespace-nowrap">
                   ▶️ YT
                 </a>
-                <button onclick="openEditModal('${s.id}')" class="text-slate-400 hover:text-indigo-400 bg-slate-800 border border-slate-700 p-1 rounded-lg text-xs" title="編集">✏️</button>
                 <button onclick="deleteSong('${s.id}')" class="text-slate-500 hover:text-rose-400 bg-slate-800 border border-slate-700 p-1 rounded-lg text-xs" title="削除">🗑️</button>
               </div>
             </div>
@@ -1193,8 +1209,8 @@ window.setScoreFilter = function(score) {
   selectedScore = score;
   document.querySelectorAll('.score-tab').forEach(b => {
     b.className = b.dataset.val === score 
-      ? 'score-tab px-2 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0' 
-      : 'score-tab px-2 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0';
+      ? 'score-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0 text-xs' 
+      : 'score-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0 text-xs';
   });
   render();
 };
@@ -1202,8 +1218,8 @@ window.setDecadeFilter = function(decade) {
   selectedDecade = decade;
   document.querySelectorAll('.decade-tab').forEach(b => {
     b.className = b.dataset.val === decade 
-      ? 'decade-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0' 
-      : 'decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0';
+      ? 'decade-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0 text-xs' 
+      : 'decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0 text-xs';
   });
   render();
 };
@@ -1262,7 +1278,7 @@ function resetModalInputs() {
   document.getElementById('formSingCount').value = '0';
   document.getElementById('formDuetType').value = 'solo';
   document.getElementById('formKey').value = '0';
-  document.getElementById('formScore').value = '歌える';
+  document.getElementById('formScore').value = '練習中';
   
   document.getElementById('apiSearchResults').innerHTML = '';
   document.getElementById('apiSearchResults').classList.add('hidden');
@@ -1310,7 +1326,7 @@ window.openEditModal = function(id) {
   document.getElementById('formScoreVal').value = s.scoreVal || '';
   document.getElementById('formDuetType').value = s.duetType || 'solo';
   document.getElementById('formKey').value = s.key || '0';
-  document.getElementById('formScore').value = s.score || '歌える';
+  document.getElementById('formScore').value = s.score || '練習中';
   document.getElementById('formTags').value = (s.tags || []).join(', ');
   document.getElementById('formMemo').value = s.memo || '';
   
