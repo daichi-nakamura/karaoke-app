@@ -14,12 +14,17 @@
 <body class="bg-slate-950 text-slate-100 min-h-screen pb-32 font-sans select-none">
 
   <!-- ヘッダー -->
-  <header class="sticky top-0 z-20 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 py-3">
+  <header class="sticky top-0 z-20 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 py-2.5">
     <div class="max-w-md mx-auto flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <span class="text-xl">🎤</span>
-        <h1 class="text-lg font-bold tracking-tight">マイカラオケリスト</h1>
+      <div class="flex items-center gap-1.5 bg-slate-800/80 p-1 rounded-xl border border-slate-700/60">
+        <button id="navTabMyList" onclick="switchMainTab('mylist')" class="px-3 py-1 rounded-lg text-xs font-bold transition bg-indigo-600 text-white shadow">
+          🎤 マイリスト
+        </button>
+        <button id="navTabRanking" onclick="switchMainTab('ranking')" class="px-3 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">
+          🔥 流行・ランキング
+        </button>
       </div>
+
       <div class="flex items-center gap-2">
         <button onclick="toggleSetlistDrawer()" class="relative bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
           📋 セトリ
@@ -32,13 +37,13 @@
     </div>
   </header>
 
-  <main class="max-w-md mx-auto p-4 space-y-3.5">
-    <!-- ステータス通知 -->
+  <!-- ==================== 1. マイリスト画面 ==================== -->
+  <main id="viewMyList" class="max-w-md mx-auto p-4 space-y-3">
     <div id="statusBanner" class="hidden text-xs p-2.5 rounded-xl border"></div>
 
-    <!-- 検索バー（歌詞・ジャンル・タグ横断検索） -->
+    <!-- 検索バー -->
     <div class="flex gap-2">
-      <input type="text" id="searchInput" oninput="render()" placeholder="曲名・歌手・歌詞・ジャンル・音域で検索..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm placeholder:text-slate-600 text-slate-100 focus:outline-none focus:border-indigo-500">
+      <input type="text" id="searchInput" oninput="render()" placeholder="曲名・歌手・歌詞・ジャンル・タグで検索..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm placeholder:text-slate-600 text-slate-100 focus:outline-none focus:border-indigo-500">
       <button onclick="pickRandom()" class="bg-slate-900 border border-slate-800 px-3.5 py-2.5 rounded-xl text-lg hover:bg-slate-800 transition" title="ランダム選曲">🎲</button>
     </div>
 
@@ -51,8 +56,20 @@
       <button onclick="setDecadeFilter('90s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800" data-val="90s">90年代以前</button>
     </div>
 
+    <!-- ジャンル別クイックフィルター -->
+    <div class="space-y-1">
+      <div class="text-[10px] text-slate-400 px-1 font-semibold flex items-center gap-1">🎵 ジャンル絞り込み</div>
+      <div id="genreFilterList" class="flex gap-1.5 overflow-x-auto no-scrollbar text-xs"></div>
+    </div>
+
+    <!-- タグ別クイックフィルター -->
+    <div class="space-y-1">
+      <div class="text-[10px] text-slate-400 px-1 font-semibold flex items-center gap-1">🏷️ タグ絞り込み</div>
+      <div id="tagFilterList" class="flex gap-1.5 overflow-x-auto no-scrollbar text-xs"></div>
+    </div>
+
     <!-- ソート & 完成度フィルター -->
-    <div class="flex items-center justify-between gap-2 text-xs">
+    <div class="flex items-center justify-between gap-2 text-xs pt-1">
       <div class="flex gap-1 overflow-x-auto no-scrollbar py-0.5" id="scoreTabs">
         <button onclick="setScoreFilter('all')" class="score-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium" data-val="all">すべて</button>
         <button onclick="setScoreFilter('得意')" class="score-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800" data-val="得意">得意</button>
@@ -66,9 +83,6 @@
         <option value="title">曲名順 (昇順)</option>
       </select>
     </div>
-
-    <!-- 自動抽出タグ絞り込み -->
-    <div id="tagList" class="flex gap-1.5 overflow-x-auto no-scrollbar text-xs"></div>
 
     <!-- ランダム選曲ポップアップ -->
     <div id="randomBanner" class="hidden bg-indigo-950/90 border border-indigo-500/60 p-4 rounded-2xl relative shadow-xl">
@@ -89,7 +103,24 @@
     <div id="songList" class="space-y-3"></div>
   </main>
 
-  <!-- セトリ管理ドロワー（画面下部・ポップアップ） -->
+  <!-- ==================== 2. 流行・ランキング画面 ==================== -->
+  <main id="viewRanking" class="max-w-md mx-auto p-4 space-y-3.5 hidden">
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="font-bold text-base text-white">🔥 Apple Music 日本トップソング</h2>
+        <p class="text-[11px] text-slate-400">いま流行っている人気の楽曲一覧です</p>
+      </div>
+      <button onclick="loadRanking()" class="text-xs text-indigo-400 bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg hover:bg-slate-800">
+        🔄 更新
+      </button>
+    </div>
+
+    <div id="rankingList" class="space-y-2.5">
+      <div class="text-center text-slate-500 py-12 text-sm">ランキングを読み込み中...</div>
+    </div>
+  </main>
+
+  <!-- セトリ管理ドロワー -->
   <div id="setlistDrawer" class="fixed inset-x-0 bottom-0 z-40 bg-slate-900/98 backdrop-blur border-t border-slate-800 p-4 transform translate-y-full transition-transform duration-300 max-w-md mx-auto rounded-t-2xl shadow-2xl space-y-3">
     <div class="flex justify-between items-center border-b border-slate-800 pb-2">
       <div class="flex items-center gap-2">
@@ -102,7 +133,6 @@
         <button onclick="toggleSetlistDrawer()" class="text-slate-400 text-sm p-1">✕</button>
       </div>
     </div>
-    
     <div id="setlistItems" class="max-h-60 overflow-y-auto no-scrollbar space-y-2"></div>
   </div>
 
@@ -111,16 +141,29 @@
     <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-5 shadow-2xl my-auto space-y-3">
       <h2 id="modalTitle" class="text-base font-bold flex items-center gap-1.5 text-white">🎵 曲を登録</h2>
       
-      <!-- iTunes自動取得 -->
+      <!-- iTunes自動取得セクション（最大50件 & ソート） -->
       <div class="bg-slate-950 border border-slate-800 p-2.5 rounded-xl space-y-2">
-        <div class="text-[11px] font-bold text-indigo-400 flex justify-between items-center">
-          <span>⚡ メタデータ & タグを自動取得</span>
-        </div>
+        <div class="text-[11px] font-bold text-indigo-400">⚡ iTunesで検索（歌手・曲名から最大50曲）</div>
         <div class="flex gap-1.5">
-          <input type="text" id="apiSearchInput" placeholder="曲名や歌手名を入力..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-slate-600 focus:outline-none">
+          <input type="text" id="apiSearchInput" placeholder="歌手名や曲名を入力..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-slate-600 focus:outline-none">
           <button type="button" onclick="searchITunes()" class="bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold">検索</button>
         </div>
-        <div id="apiSearchResults" class="max-h-48 overflow-y-auto no-scrollbar space-y-1.5 hidden"></div>
+        
+        <!-- 検索結果のソート順選択バー -->
+        <div id="apiSortRow" class="hidden flex items-center justify-between text-[11px] text-slate-400 pt-1">
+          <span id="apiResultCount">0件</span>
+          <div class="flex items-center gap-1">
+            <span>並び順:</span>
+            <select id="apiSortSelect" onchange="renderITunesResults()" class="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-slate-200 text-[10px] focus:outline-none">
+              <option value="default">人気・関連度順</option>
+              <option value="title">曲名順 (あいうえお)</option>
+              <option value="yearDesc">リリース年が新しい順</option>
+              <option value="yearAsc">リリース年が古い順</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="apiSearchResults" class="max-h-52 overflow-y-auto no-scrollbar space-y-1.5 hidden"></div>
       </div>
 
       <form onsubmit="handleSave(event)" class="space-y-3 text-sm">
@@ -147,8 +190,8 @@
             <input type="text" id="formArtist" placeholder="例: King Gnu" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500">
           </div>
           <div>
-            <label class="block text-xs text-slate-400 mb-1">ジャンル</label>
-            <input type="text" id="formGenre" placeholder="J-Pop" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500">
+            <label class="block text-xs text-slate-400 mb-1">ジャンル（独立項目）</label>
+            <input type="text" id="formGenre" placeholder="例: J-Pop, アニメ, ロック" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500">
           </div>
         </div>
 
@@ -194,8 +237,8 @@
         </div>
 
         <div>
-          <label class="block text-xs text-slate-400 mb-1">自動タグ（自動付与＋手動調整可）</label>
-          <input type="text" id="formTags" placeholder="カンマ区切りで入力" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500">
+          <label class="block text-xs text-slate-400 mb-1">タグ（年代等から自動設定・カンマ区切り）</label>
+          <input type="text" id="formTags" placeholder="盛り上がる, バラード, 声出し 等" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500">
         </div>
 
         <div>
@@ -275,7 +318,10 @@
 
   <script>
     window.songs = [];
+    let rankingSongs = [];
+    let currentRawITunesResults = [];
     let setlist = JSON.parse(localStorage.getItem('karaoke_setlist')) || [];
+    let selectedGenre = null;
     let selectedTag = null;
     let selectedScore = 'all';
     let selectedDecade = 'all';
@@ -288,78 +334,202 @@
       renderSetlist();
     }
 
-    // 自動タグ生成ロジック
-    function generateAutoTags(item) {
-      const tags = [];
-      const yr = parseInt(item.year, 10);
-      if (yr >= 2020) tags.push('2020年代');
-      else if (yr >= 2010) tags.push('2010年代');
-      else if (yr >= 2000) tags.push('2000年代');
-      else if (yr < 2000) tags.push('90年代以前');
+    // タブ切り替え（マイリスト ⇔ ランキング）
+    window.switchMainTab = function(tab) {
+      const btnMyList = document.getElementById('navTabMyList');
+      const btnRanking = document.getElementById('navTabRanking');
+      const viewMyList = document.getElementById('viewMyList');
+      const viewRanking = document.getElementById('viewRanking');
 
-      if (item.genre) {
-        if (item.genre.toLowerCase().includes('anime') || item.genre.includes('アニメ')) tags.push('アニソン');
-        else if (item.genre.toLowerCase().includes('rock')) tags.push('ロック');
-        else if (item.genre.toLowerCase().includes('pop')) tags.push('J-Pop');
-        else tags.push(item.genre);
+      if (tab === 'mylist') {
+        btnMyList.className = "px-3 py-1 rounded-lg text-xs font-bold transition bg-indigo-600 text-white shadow";
+        btnRanking.className = "px-3 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white";
+        viewMyList.classList.remove('hidden');
+        viewRanking.classList.add('hidden');
+      } else {
+        btnRanking.className = "px-3 py-1 rounded-lg text-xs font-bold transition bg-indigo-600 text-white shadow";
+        btnMyList.className = "px-3 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white";
+        viewRanking.classList.remove('hidden');
+        viewMyList.classList.add('hidden');
+        if (rankingSongs.length === 0) {
+          loadRanking();
+        }
+      }
+    };
+
+    // ランキング（Apple Music トップソング取得）
+    window.loadRanking = async function() {
+      const container = document.getElementById('rankingList');
+      container.innerHTML = '<div class="text-center text-slate-500 py-12 text-sm">ランキングを取得中...</div>';
+      try {
+        const res = await fetch('https://itunes.apple.com/jp/rss/topsongs/limit=50/json');
+        const data = await res.json();
+        const entries = data.feed.entry || [];
+        
+        rankingSongs = entries.map((entry, idx) => {
+          const title = entry['im:name'] ? entry['im:name'].label : '';
+          const artist = entry['im:artist'] ? entry['im:artist'].label : '';
+          const artwork = entry['im:image'] && entry['im:image'].length > 2 ? entry['im:image'][2].label : '';
+          const releaseDate = entry['im:releaseDate'] ? entry['im:releaseDate'].label : '';
+          const year = releaseDate ? releaseDate.substring(0, 4) : '';
+          const genre = entry.category && entry.category.attributes ? entry.category.attributes.label : 'J-Pop';
+          
+          let previewUrl = '';
+          if (entry.link) {
+            const previewLink = entry.link.find(l => l.attributes && l.attributes.title === 'Preview');
+            if (previewLink) previewUrl = previewLink.attributes.href;
+          }
+
+          return { rank: idx + 1, title, artist, artwork, year, genre, previewUrl };
+        });
+
+        renderRanking();
+      } catch (e) {
+        container.innerHTML = '<div class="text-center text-rose-400 py-12 text-sm">ランキングの取得に失敗しました</div>';
+      }
+    };
+
+    function renderRanking() {
+      const container = document.getElementById('rankingList');
+      if (rankingSongs.length === 0) {
+        container.innerHTML = '<div class="text-center text-slate-500 py-12 text-sm">曲がありません</div>';
+        return;
       }
 
-      if (item.durationMs) {
-        if (item.durationMs < 190000) tags.push('短め');
-        else if (item.durationMs > 300000) tags.push('長尺');
-      }
+      container.innerHTML = rankingSongs.map(item => {
+        const isPlaying = currentPlayingId === `ranking_${item.rank}`;
+        const alreadyInList = (window.songs || []).some(s => s.title.toLowerCase() === item.title.toLowerCase() && s.artist.toLowerCase() === item.artist.toLowerCase());
+        const encoded = encodeURIComponent(JSON.stringify(item));
 
-      return Array.from(new Set(tags));
+        return `
+          <div class="bg-slate-900/90 border border-slate-800 p-3 rounded-2xl flex items-center gap-3">
+            <span class="font-mono font-bold text-sm text-indigo-400 w-5 text-center shrink-0">${item.rank}</span>
+            <img src="${item.artwork || ''}" class="w-12 h-12 rounded-xl object-cover shrink-0 bg-slate-800 shadow">
+            
+            <div class="min-w-0 flex-1">
+              <div class="font-bold text-sm text-white truncate">${escapeHtml(item.title)}</div>
+              <div class="text-xs text-slate-400 truncate">${escapeHtml(item.artist)}</div>
+              <div class="text-[10px] text-slate-500 mt-0.5">${item.year}年 • ${escapeHtml(item.genre)}</div>
+            </div>
+
+            <div class="flex flex-col items-end gap-1.5 shrink-0">
+              <button onclick="addFromRanking('${encoded}')" class="text-xs px-2.5 py-1 rounded-lg font-bold border transition ${alreadyInList ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-500'}">
+                ${alreadyInList ? '登録済' : '＋ 追加'}
+              </button>
+              ${item.previewUrl ? `
+                <button onclick="togglePlayPreview('${item.previewUrl}', 'ranking_${item.rank}')" class="text-[10px] px-2 py-0.5 rounded border ${isPlaying ? 'bg-rose-900 text-rose-200 border-rose-700' : 'bg-slate-800 text-slate-400 border-slate-700'}">
+                  ${isPlaying ? '⏹ 停止' : '▶ 試聴'}
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
     }
 
+    window.addFromRanking = function(encoded) {
+      const data = JSON.parse(decodeURIComponent(encoded));
+      openModal();
+      document.getElementById('formTitle').value = data.title;
+      document.getElementById('formArtist').value = data.artist;
+      document.getElementById('formYear').value = data.year;
+      document.getElementById('formGenre').value = data.genre;
+      document.getElementById('formArtwork').value = data.artwork;
+      document.getElementById('formPreviewUrl').value = data.previewUrl;
+      
+      // 年代からタグ自動付与（ジャンルは入れない）
+      const yr = parseInt(data.year, 10);
+      const tags = [];
+      if (yr >= 2020) tags.push('2020年代');
+      else if (yr >= 2010) tags.push('2010年代');
+      tags.push('流行・ヒット');
+      document.getElementById('formTags').value = tags.join(', ');
+    };
+
+    // iTunes検索（最大50件取得）
     window.searchITunes = async function() {
       const term = document.getElementById('apiSearchInput').value.trim();
       const resultBox = document.getElementById('apiSearchResults');
+      const sortRow = document.getElementById('apiSortRow');
       if (!term) return;
 
       resultBox.classList.remove('hidden');
-      resultBox.innerHTML = '<div class="text-[11px] text-slate-500 py-1">検索中...</div>';
+      sortRow.classList.add('hidden');
+      resultBox.innerHTML = '<div class="text-[11px] text-slate-500 py-1">50件取得中...</div>';
 
       try {
-        const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=jp&entity=song&limit=6`);
+        const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=jp&entity=song&limit=50`);
         const data = await res.json();
         if (!data.results || data.results.length === 0) {
-          resultBox.innerHTML = '<div class="text-[11px] text-slate-500 py-1">見つかりませんでした</div>';
+          resultBox.innerHTML = '<div class="text-[11px] text-slate-500 py-1">曲が見つかりませんでした</div>';
           return;
         }
 
-        resultBox.innerHTML = data.results.map((item) => {
+        currentRawITunesResults = data.results.map(item => {
           const year = item.releaseDate ? item.releaseDate.substring(0, 4) : '';
           const mins = Math.floor((item.trackTimeMillis || 0) / 60000);
           const secs = Math.floor(((item.trackTimeMillis || 0) % 60000) / 1000).toString().padStart(2, '0');
           const duration = item.trackTimeMillis ? `${mins}:${secs}` : '';
-          const autoTags = generateAutoTags({ year, genre: item.primaryGenreName, durationMs: item.trackTimeMillis });
-          
-          const rawItem = encodeURIComponent(JSON.stringify({
+
+          // タグの自動生成（ジャンルは含めず、純粋な年代や曲長属性のみ）
+          const tags = [];
+          const yr = parseInt(year, 10);
+          if (yr >= 2020) tags.push('2020年代');
+          else if (yr >= 2010) tags.push('2010年代');
+          else if (yr >= 2000) tags.push('2000年代');
+          else if (yr < 2000) tags.push('90年代以前');
+
+          if (item.trackTimeMillis && item.trackTimeMillis < 190000) tags.push('短め');
+          else if (item.trackTimeMillis && item.trackTimeMillis > 300000) tags.push('長尺');
+
+          return {
             title: item.trackName,
             artist: item.artistName,
             year: year,
-            genre: item.primaryGenreName || '',
+            genre: item.primaryGenreName || 'J-Pop',
             artwork: item.artworkUrl100 || '',
             previewUrl: item.previewUrl || '',
             duration: duration,
-            autoTags: autoTags
-          }));
+            tags: tags
+          };
+        });
 
-          return `
-            <div onclick="selectITunesSong('${rawItem}')" class="flex items-center gap-2.5 p-2 hover:bg-slate-900 rounded-xl cursor-pointer border border-slate-800 transition">
-              <img src="${item.artworkUrl100 || ''}" class="w-10 h-10 rounded-lg object-cover shrink-0 bg-slate-800 shadow">
-              <div class="min-w-0 flex-1">
-                <div class="text-xs font-bold text-white truncate">${escapeHtml(item.trackName)}</div>
-                <div class="text-[10px] text-slate-500 truncate">${escapeHtml(item.artistName)} • ${year || '年不明'} • ${item.primaryGenreName || ''}</div>
-                <div class="text-[9px] text-indigo-400 mt-0.5 truncate">自動タグ: ${autoTags.join(', ')}</div>
-              </div>
-            </div>
-          `;
-        }).join('');
+        sortRow.classList.remove('hidden');
+        renderITunesResults();
       } catch (e) {
         resultBox.innerHTML = '<div class="text-[11px] text-rose-400 py-1">検索に失敗しました</div>';
       }
+    };
+
+    window.renderITunesResults = function() {
+      const resultBox = document.getElementById('apiSearchResults');
+      const sortMode = document.getElementById('apiSortSelect').value;
+      const countEl = document.getElementById('apiResultCount');
+      
+      let list = [...currentRawITunesResults];
+      if (sortMode === 'title') {
+        list.sort((a, b) => a.title.localeCompare(b.title, 'ja'));
+      } else if (sortMode === 'yearDesc') {
+        list.sort((a, b) => (parseInt(b.year, 10) || 0) - (parseInt(a.year, 10) || 0));
+      } else if (sortMode === 'yearAsc') {
+        list.sort((a, b) => (parseInt(a.year, 10) || 0) - (parseInt(b.year, 10) || 0));
+      }
+
+      countEl.textContent = `${list.length}件の曲`;
+
+      resultBox.innerHTML = list.map(item => {
+        const rawItem = encodeURIComponent(JSON.stringify(item));
+        return `
+          <div onclick="selectITunesSong('${rawItem}')" class="flex items-center gap-2.5 p-2 hover:bg-slate-900 rounded-xl cursor-pointer border border-slate-800 transition">
+            <img src="${item.artwork || ''}" class="w-10 h-10 rounded-lg object-cover shrink-0 bg-slate-800 shadow">
+            <div class="min-w-0 flex-1">
+              <div class="text-xs font-bold text-white truncate">${escapeHtml(item.title)}</div>
+              <div class="text-[10px] text-slate-500 truncate">${escapeHtml(item.artist)} • ${item.year || '年不明'} • ${escapeHtml(item.genre)}</div>
+              <div class="text-[9px] text-indigo-400 mt-0.5 truncate">自動タグ: #${item.tags.join(' #')}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
     };
 
     window.selectITunesSong = function(encoded) {
@@ -371,14 +541,14 @@
       document.getElementById('formArtwork').value = data.artwork;
       document.getElementById('formPreviewUrl').value = data.previewUrl;
       document.getElementById('formDuration').value = data.duration;
-      document.getElementById('formTags').value = (data.autoTags || []).join(', ');
+      document.getElementById('formTags').value = (data.tags || []).join(', ');
       document.getElementById('apiSearchResults').classList.add('hidden');
+      document.getElementById('apiSortRow').classList.add('hidden');
     };
 
     // セトリ管理
     window.toggleSetlistDrawer = function() {
-      const drawer = document.getElementById('setlistDrawer');
-      drawer.classList.toggle('translate-y-full');
+      document.getElementById('setlistDrawer').classList.toggle('translate-y-full');
     };
 
     window.addToSetlist = function(id) {
@@ -386,8 +556,7 @@
         setlist.push(id);
         saveSetlist();
       }
-      const drawer = document.getElementById('setlistDrawer');
-      drawer.classList.remove('translate-y-full');
+      document.getElementById('setlistDrawer').classList.remove('translate-y-full');
     };
 
     window.removeFromSetlist = function(id) {
@@ -426,7 +595,7 @@
       }
 
       if (setlist.length === 0) {
-        container.innerHTML = '<div class="text-center text-slate-500 py-6 text-xs">セトリに曲がありません。「＋ セトリに追加」を押して登録してください</div>';
+        container.innerHTML = '<div class="text-center text-slate-500 py-6 text-xs">セトリに曲がありません。「＋ セトリ」を押して追加してください</div>';
         return;
       }
 
@@ -462,6 +631,7 @@
         currentAudio = null;
         currentPlayingId = null;
         render();
+        renderRanking();
         return;
       }
       if (currentAudio) {
@@ -473,8 +643,10 @@
       currentAudio.onended = () => {
         currentPlayingId = null;
         render();
+        renderRanking();
       };
       render();
+      renderRanking();
     };
 
     function escapeHtml(str) {
@@ -497,7 +669,6 @@
       const sortMode = document.getElementById('sortSelect').value;
 
       let filtered = (window.songs || []).filter(s => {
-        // 全文検索（歌詞・ジャンル・タグ・音域・メモをすべて網羅）
         const matchesQuery = (s.title || '').toLowerCase().includes(queryStr) || 
                              (s.artist || '').toLowerCase().includes(queryStr) ||
                              (s.memo || '').toLowerCase().includes(queryStr) ||
@@ -506,6 +677,8 @@
                              (s.minPitch || '').toLowerCase().includes(queryStr) ||
                              (s.year ? s.year.toString().includes(queryStr) : false) ||
                              (s.tags && s.tags.some(t => t.toLowerCase().includes(queryStr)));
+        
+        const matchesGenre = selectedGenre ? s.genre === selectedGenre : true;
         const matchesTag = selectedTag ? s.tags && s.tags.includes(selectedTag) : true;
         const matchesScore = selectedScore === 'all' ? true : s.score === selectedScore;
         
@@ -516,7 +689,7 @@
         else if (selectedDecade === '2000s') matchesDecade = yr >= 2000 && yr <= 2009;
         else if (selectedDecade === '90s') matchesDecade = yr < 2000;
 
-        return matchesQuery && matchesTag && matchesScore && matchesDecade;
+        return matchesQuery && matchesGenre && matchesTag && matchesScore && matchesDecade;
       });
 
       filtered.sort((a, b) => {
@@ -526,13 +699,25 @@
         return (b.createdAt || 0) - (a.createdAt || 0);
       });
 
+      // ジャンル別フィルターの描画
+      const allGenres = Array.from(new Set((window.songs || []).map(s => s.genre).filter(Boolean)));
+      const genreContainer = document.getElementById('genreFilterList');
+      genreContainer.innerHTML = '';
+      if (allGenres.length > 0) {
+        genreContainer.innerHTML += `<button onclick="setFilterGenre(null)" class="px-2.5 py-0.5 rounded-full whitespace-nowrap transition ${selectedGenre === null ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">全ジャンル</button>`;
+        allGenres.forEach(g => {
+          genreContainer.innerHTML += `<button onclick="setFilterGenre('${g}')" class="px-2.5 py-0.5 rounded-full whitespace-nowrap transition ${selectedGenre === g ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">${escapeHtml(g)}</button>`;
+        });
+      }
+
+      // タグ別フィルターの描画
       const allTags = Array.from(new Set((window.songs || []).flatMap(s => s.tags || [])));
-      const tagContainer = document.getElementById('tagList');
+      const tagContainer = document.getElementById('tagFilterList');
       tagContainer.innerHTML = '';
       if (allTags.length > 0) {
-        tagContainer.innerHTML += `<button onclick="setFilterTag(null)" class="px-2.5 py-1 rounded-full whitespace-nowrap transition ${selectedTag === null ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">全タグ</button>`;
+        tagContainer.innerHTML += `<button onclick="setFilterTag(null)" class="px-2.5 py-0.5 rounded-full whitespace-nowrap transition ${selectedTag === null ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">全タグ</button>`;
         allTags.forEach(tag => {
-          tagContainer.innerHTML += `<button onclick="setFilterTag('${tag}')" class="px-2.5 py-1 rounded-full whitespace-nowrap transition ${selectedTag === tag ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">#${tag}</button>`;
+          tagContainer.innerHTML += `<button onclick="setFilterTag('${tag}')" class="px-2.5 py-0.5 rounded-full whitespace-nowrap transition ${selectedTag === tag ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">#${tag}</button>`;
         });
       }
 
@@ -582,9 +767,9 @@
                     s.score === '歌える' ? 'bg-sky-950 text-sky-400 border border-sky-800/80' :
                     'bg-amber-950 text-amber-400 border border-amber-800/80'
                   }">${s.score}</span>
+                  ${s.genre ? `<span class="bg-indigo-950/60 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-800/60">${escapeHtml(s.genre)}</span>` : ''}
                   ${s.year ? `<span class="bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700/60 font-mono">${s.year}年</span>` : ''}
                   ${s.duration ? `<span class="bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700/60 font-mono">${s.duration}</span>` : ''}
-                  ${s.genre ? `<span class="bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700/60">${escapeHtml(s.genre)}</span>` : ''}
                   ${s.maxPitch ? `<span class="bg-amber-950/70 text-amber-300 px-1.5 py-0.5 rounded border border-amber-800/60 font-mono">最高 ${escapeHtml(s.maxPitch)}</span>` : ''}
                   ${s.minPitch ? `<span class="bg-sky-950/70 text-sky-300 px-1.5 py-0.5 rounded border border-sky-800/60 font-mono">最低 ${escapeHtml(s.minPitch)}</span>` : ''}
                 </div>
@@ -653,8 +838,13 @@
       render();
     };
 
-    window.setFilterTag = function(tag) {
-      selectedTag = tag;
+    window.setFilterGenre = function(g) {
+      selectedGenre = g;
+      render();
+    };
+
+    window.setFilterTag = function(t) {
+      selectedTag = t;
       render();
     };
 
@@ -706,6 +896,7 @@
       document.getElementById('formMemo').value = '';
       document.getElementById('apiSearchInput').value = '';
       document.getElementById('apiSearchResults').classList.add('hidden');
+      document.getElementById('apiSortRow').classList.add('hidden');
       document.getElementById('resetSungRow').classList.add('hidden');
       document.getElementById('modal').classList.remove('hidden');
     };
@@ -730,6 +921,7 @@
       document.getElementById('formTags').value = (s.tags || []).join(', ');
       document.getElementById('formMemo').value = s.memo || '';
       document.getElementById('apiSearchResults').classList.add('hidden');
+      document.getElementById('apiSortRow').classList.add('hidden');
       
       const resetRow = document.getElementById('resetSungRow');
       if (s.lastSungAt) {
@@ -761,14 +953,14 @@
       const editId = document.getElementById('editSongId').value;
       const tags = document.getElementById('formTags').value
         .split(/[\s,、]+/)
-        .map(t => t.trim())
+        .map(t => t.trim().replace(/^#/, ''))
         .filter(Boolean);
 
       const songData = {
         title: document.getElementById('formTitle').value,
         artist: document.getElementById('formArtist').value,
         year: document.getElementById('formYear').value,
-        genre: document.getElementById('formGenre').value,
+        genre: document.getElementById('formGenre').value.trim(),
         maxPitch: document.getElementById('formMaxPitch').value.trim(),
         minPitch: document.getElementById('formMinPitch').value.trim(),
         artwork: document.getElementById('formArtwork').value,
@@ -806,9 +998,10 @@
 
     window.pickRandom = function() {
       let pool = (window.songs || []).filter(s => {
+        const matchesGenre = selectedGenre ? s.genre === selectedGenre : true;
         const matchesTag = selectedTag ? s.tags && s.tags.includes(selectedTag) : true;
         const matchesScore = selectedScore === 'all' ? true : s.score === selectedScore;
-        return matchesTag && matchesScore;
+        return matchesGenre && matchesTag && matchesScore;
       });
       if (pool.length === 0) pool = window.songs;
       if (!pool || pool.length === 0) return;
