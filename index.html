@@ -2,9 +2,50 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>マイカラオケリスト</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Firebase SDK (v10 modular via CDN) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+    import { 
+      getFirestore, 
+      collection, 
+      addDoc, 
+      updateDoc, 
+      deleteDoc, 
+      doc, 
+      onSnapshot, 
+      query, 
+      orderBy,
+      enableIndexedDbPersistence 
+    } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+
+    // ====== ここにご自身のFirebase設定を貼り付け ======
+    const firebaseConfig = {
+      apiKey: "AIzaSyCGxnALF5RNC1RvhE-IOEWDrHNnf4a56r4",
+      authDomain: "karaoke-app-7feaf.firebaseapp.com",
+      projectId: "karaoke-app-7feaf",
+      storageBucket: "karaoke-app-7feaf.firebasestorage.app",
+      messagingSenderId: "521842530298",
+      appId: "1:521842530298:web:1180dc25027ca21f90f643"
+    };
+    // ===============================================
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // オフラインキャッシュの有効化（地下でも爆速で動き、電波復帰時に自動同期）
+    try {
+      enableIndexedDbPersistence(db);
+    } catch (err) {
+      console.warn("Offline persistence error:", err.code);
+    }
+
+    window.db = db;
+    window.firestoreOps = { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy };
+    window.initApp();
+  </script>
   <style>
     body { -webkit-tap-highlight-color: transparent; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -20,19 +61,16 @@
         <span class="text-xl">🎤</span>
         <h1 class="text-lg font-bold tracking-tight">マイカラオケリスト</h1>
       </div>
-      <div class="flex items-center gap-2">
-        <button onclick="toggleSettings()" class="p-2 text-slate-400 hover:text-white" title="設定・バックアップ">⚙️</button>
-        <button onclick="openModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow flex items-center gap-1 transition">
-          ＋ 追加
-        </button>
-      </div>
+      <button onclick="openModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow flex items-center gap-1 transition">
+        ＋ 追加
+      </button>
     </div>
   </header>
 
   <main class="max-w-md mx-auto p-4 space-y-3.5">
-    <!-- 検索 & ランダム -->
+    <!-- 検索 & ランダム選曲 -->
     <div class="flex gap-2">
-      <input type="text" id="searchInput" oninput="render()" placeholder="曲名・歌手・タグ・メモで検索..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-500">
+      <input type="text" id="searchInput" oninput="render()" placeholder="保存済みリスト内を検索..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-500">
       <button onclick="pickRandom()" class="bg-slate-900 border border-slate-800 px-3.5 py-2.5 rounded-xl text-lg hover:bg-slate-800 transition" title="ランダム選曲">🎲</button>
     </div>
 
@@ -45,8 +83,8 @@
         <button onclick="setScoreFilter('練習中')" class="score-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800" data-val="練習中">練習中</button>
       </div>
       <select id="sortSelect" onchange="render()" class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-slate-300 focus:outline-none shrink-0">
-        <option value="newest">登録が新しい順</option>
         <option value="lastSung">最近歌った順</option>
+        <option value="newest">新しく追加した順</option>
         <option value="title">曲名順 (昇順)</option>
       </select>
     </div>
@@ -54,8 +92,8 @@
     <!-- タグ絞り込み -->
     <div id="tagList" class="flex gap-1.5 overflow-x-auto no-scrollbar text-xs"></div>
 
-    <!-- ランダム選曲結果ポップアップ -->
-    <div id="randomBanner" class="hidden bg-indigo-950/90 border border-indigo-500/60 p-4 rounded-2xl relative shadow-xl animate-in">
+    <!-- ランダム選曲結果 -->
+    <div id="randomBanner" class="hidden bg-indigo-950/90 border border-indigo-500/60 p-4 rounded-2xl relative shadow-xl">
       <div class="text-xs font-bold text-indigo-400 mb-1">🎲 おすすめの1曲！</div>
       <div id="randomTitle" class="text-lg font-bold text-white"></div>
       <div id="randomArtist" class="text-sm text-slate-300"></div>
@@ -63,39 +101,32 @@
       <button onclick="closeRandom()" class="absolute top-2.5 right-2.5 text-slate-400 hover:text-white text-xs p-1">✕</button>
     </div>
 
-    <!-- 件数カウント -->
-    <div class="text-[11px] text-slate-400 px-1 flex justify-between">
-      <span id="songCount">0曲</span>
-    </div>
-
     <!-- 曲一覧 -->
+    <div class="text-[11px] text-slate-400 px-1 flex justify-between">
+      <span id="songCount">同期中...</span>
+    </div>
     <div id="songList" class="space-y-3"></div>
   </main>
 
-  <!-- バックアップ・設定モーダル -->
-  <div id="settingsModal" class="fixed inset-0 z-50 bg-black/75 hidden flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-5 shadow-2xl space-y-4">
-      <div class="flex justify-between items-center border-b border-slate-800 pb-2">
-        <h3 class="font-bold text-white">⚙️ データ管理・バックアップ</h3>
-        <button onclick="toggleSettings()" class="text-slate-400 p-1">✕</button>
-      </div>
-      <p class="text-xs text-slate-400 leading-relaxed">曲データをファイルとして保存しておくと、端末の機種変更時や誤削除時にも復元できます。</p>
-      <div class="space-y-2">
-        <button onclick="exportData()" class="w-full bg-slate-800 hover:bg-slate-700 text-indigo-400 border border-slate-700 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5">
-          📥 データをファイルに書き出す (保存)
-        </button>
-        <label class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer">
-          📤 ファイルから復元する
-          <input type="file" accept=".json" onchange="importData(event)" class="hidden">
-        </label>
-      </div>
-    </div>
-  </div>
-
   <!-- 追加・編集モーダル -->
   <div id="modal" class="fixed inset-0 z-50 bg-black/75 hidden flex items-center justify-center p-4 overflow-y-auto">
-    <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-5 shadow-2xl my-auto">
-      <h2 id="modalTitle" class="text-base font-bold mb-4 flex items-center gap-1.5 text-white">🎵 曲を登録</h2>
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-5 shadow-2xl my-auto space-y-3">
+      <h2 id="modalTitle" class="text-base font-bold flex items-center gap-1.5 text-white">🎵 曲を登録</h2>
+      
+      <!-- iTunes曲名オートコンプリート検索バー -->
+      <div class="bg-slate-950 border border-slate-800 p-2.5 rounded-xl space-y-2">
+        <div class="text-[11px] font-bold text-indigo-400 flex items-center gap-1">
+          <span>⚡ Apple Music / iTunes で自動補完</span>
+        </div>
+        <div class="flex gap-1.5">
+          <input type="text" id="apiSearchInput" placeholder="曲名や歌手名を入力..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none">
+          <button type="button" onclick="searchITunes()" class="bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold">
+            検索
+          </button>
+        </div>
+        <div id="apiSearchResults" class="max-h-36 overflow-y-auto no-scrollbar space-y-1 hidden"></div>
+      </div>
+
       <form onsubmit="handleSave(event)" class="space-y-3 text-sm">
         <input type="hidden" id="editSongId" value="">
         <div>
@@ -108,7 +139,7 @@
         </div>
         <div class="grid grid-cols-2 gap-2">
           <div>
-            <label class="block text-xs text-slate-400 mb-1">キー調整</label>
+            <label class="block text-xs text-slate-400 mb-1">キー設定</label>
             <select id="formKey" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-100 focus:outline-none">
               <option value="-6">-6</option>
               <option value="-5">-5</option>
@@ -139,10 +170,10 @@
           <input type="text" id="formTags" placeholder="盛り上がる, アニソン, バラード" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-100 focus:outline-none focus:border-indigo-500">
         </div>
         <div>
-          <label class="block text-xs text-slate-400 mb-1">メモ（歌唱のコツ・音程など）</label>
+          <label class="block text-xs text-slate-400 mb-1">メモ</label>
           <textarea id="formMemo" rows="2" placeholder="サビ高音、ラスト転調注意など" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-100 resize-none focus:outline-none focus:border-indigo-500"></textarea>
         </div>
-        <div class="flex gap-2 pt-2">
+        <div class="flex gap-2 pt-1">
           <button type="button" onclick="closeModal()" class="flex-1 bg-slate-800 text-slate-300 py-2.5 rounded-lg font-bold">キャンセル</button>
           <button type="submit" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-lg font-bold transition">保存</button>
         </div>
@@ -151,17 +182,62 @@
   </div>
 
   <script>
-    const INITIAL_DATA = [
-      { id: '1', title: '怪獣の花唄', artist: 'Vaundy', key: '0', score: '得意', tags: ['盛り上がる'], memo: 'サビは息継ぎ意識', lastSungAt: Date.now() - 86400000 * 2 },
-      { id: '2', title: 'ドライフラワー', artist: '優里', key: '-1', score: '歌える', tags: ['バラード'], memo: '後半の転調注意', lastSungAt: null }
-    ];
-
-    let songs = JSON.parse(localStorage.getItem('karaoke_list_v2')) || INITIAL_DATA;
+    let songs = [];
     let selectedTag = null;
     let selectedScore = 'all';
 
-    function saveToStorage() {
-      localStorage.setItem('karaoke_list_v2', JSON.stringify(songs));
+    window.initApp = function() {
+      const { collection, onSnapshot, query, orderBy } = window.firestoreOps;
+      const q = query(collection(window.db, "songs"), orderBy("createdAt", "desc"));
+
+      // Firestoreのリアルタイムリスナー（クラウド同期 & オフラインキャッシュ連動）
+      onSnapshot(q, (snapshot) => {
+        songs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        render();
+      }, (err) => {
+        console.error("Firestore sync error:", err);
+      });
+    };
+
+    // iTunes APIオートコンプリート検索
+    window.searchITunes = async function() {
+      const term = document.getElementById('apiSearchInput').value.trim();
+      const resultBox = document.getElementById('apiSearchResults');
+      if (!term) return;
+
+      resultBox.classList.remove('hidden');
+      resultBox.innerHTML = '<div class="text-[11px] text-slate-400 py-1">検索中...</div>';
+
+      try {
+        const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=jp&entity=song&limit=5`);
+        const data = await res.json();
+        if (!data.results || data.results.length === 0) {
+          resultBox.innerHTML = '<div class="text-[11px] text-slate-500 py-1">見つかりませんでした</div>';
+          return;
+        }
+
+        resultBox.innerHTML = data.results.map(item => `
+          <div onclick="selectITunesSong('${escapeHtml(item.trackName)}', '${escapeHtml(item.artistName)}')" class="flex items-center gap-2 p-1.5 hover:bg-slate-900 rounded-lg cursor-pointer border border-slate-800/80">
+            <img src="${item.artworkUrl60 || ''}" class="w-8 h-8 rounded object-cover shrink-0 bg-slate-800">
+            <div class="min-w-0 flex-1">
+              <div class="text-xs font-bold text-white truncate">${escapeHtml(item.trackName)}</div>
+              <div class="text-[10px] text-slate-400 truncate">${escapeHtml(item.artistName)}</div>
+            </div>
+          </div>
+        `).join('');
+      } catch (e) {
+        resultBox.innerHTML = '<div class="text-[11px] text-rose-400 py-1">検索エラーが発生しました</div>';
+      }
+    };
+
+    window.selectITunesSong = function(title, artist) {
+      document.getElementById('formTitle').value = title;
+      document.getElementById('formArtist').value = artist;
+      document.getElementById('apiSearchResults').classList.add('hidden');
+    };
+
+    function escapeHtml(str) {
+      return (str || '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
     }
 
     function formatDate(ts) {
@@ -176,27 +252,26 @@
     }
 
     function render() {
-      const query = document.getElementById('searchInput').value.toLowerCase();
+      const queryStr = document.getElementById('searchInput').value.toLowerCase();
       const sortMode = document.getElementById('sortSelect').value;
 
       let filtered = songs.filter(s => {
-        const matchesQuery = s.title.toLowerCase().includes(query) || 
-                             (s.artist && s.artist.toLowerCase().includes(query)) ||
-                             (s.memo && s.memo.toLowerCase().includes(query)) ||
-                             (s.tags && s.tags.some(t => t.toLowerCase().includes(query)));
+        const matchesQuery = (s.title || '').toLowerCase().includes(queryStr) || 
+                             (s.artist || '').toLowerCase().includes(queryStr) ||
+                             (s.memo || '').toLowerCase().includes(queryStr) ||
+                             (s.tags && s.tags.some(t => t.toLowerCase().includes(queryStr)));
         const matchesTag = selectedTag ? s.tags && s.tags.includes(selectedTag) : true;
         const matchesScore = selectedScore === 'all' ? true : s.score === selectedScore;
         return matchesQuery && matchesTag && matchesScore;
       });
 
-      // ソート処理
       filtered.sort((a, b) => {
         if (sortMode === 'lastSung') return (b.lastSungAt || 0) - (a.lastSungAt || 0);
-        if (sortMode === 'title') return a.title.localeCompare(b.title, 'ja');
-        return Number(b.id) - Number(a.id); // newest
+        if (sortMode === 'title') return (a.title || '').localeCompare(b.title || '', 'ja');
+        return (b.createdAt || 0) - (a.createdAt || 0);
       });
 
-      // タグ一覧の描画
+      // タグ一覧
       const allTags = Array.from(new Set(songs.flatMap(s => s.tags || [])));
       const tagContainer = document.getElementById('tagList');
       tagContainer.innerHTML = '';
@@ -207,12 +282,11 @@
         });
       }
 
-      document.getElementById('songCount').textContent = `該当: ${filtered.length}曲 / 全${songs.length}曲`;
+      document.getElementById('songCount').textContent = `登録曲: ${filtered.length}曲 / 全${songs.length}曲`;
 
-      // 曲カード描画
       const listContainer = document.getElementById('songList');
       if (filtered.length === 0) {
-        listContainer.innerHTML = '<div class="text-center text-slate-500 py-12 text-sm">条件に一致する曲がありません</div>';
+        listContainer.innerHTML = '<div class="text-center text-slate-500 py-12 text-sm">曲が登録されていません</div>';
         return;
       }
 
@@ -221,44 +295,44 @@
           <div class="flex justify-between items-start gap-2">
             <div class="flex-1 min-w-0">
               <div class="font-bold text-base text-white flex items-center gap-1.5 flex-wrap">
-                <span class="truncate">${s.title}</span>
+                <span class="truncate">${escapeHtml(s.title)}</span>
                 <span class="text-[10px] px-1.5 py-0.5 rounded font-medium ${
                   s.score === '得意' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/80' :
                   s.score === '歌える' ? 'bg-sky-950 text-sky-400 border border-sky-800/80' :
                   'bg-amber-950 text-amber-400 border border-amber-800/80'
                 }">${s.score}</span>
               </div>
-              <div class="text-xs text-slate-400 truncate mt-0.5">${s.artist || '歌手未設定'}</div>
+              <div class="text-xs text-slate-400 truncate mt-0.5">${escapeHtml(s.artist) || '歌手未設定'}</div>
             </div>
             <div class="flex items-center gap-1 shrink-0">
               <span class="text-xs px-2 py-0.5 rounded-md font-mono font-bold ${
                 s.key === '0' ? 'bg-slate-800 text-slate-300 border border-slate-700' :
-                s.key.startsWith('+') ? 'bg-rose-950 text-rose-300 border border-rose-800' :
+                (s.key || '').startsWith('+') ? 'bg-rose-950 text-rose-300 border border-rose-800' :
                 'bg-blue-950 text-blue-300 border border-blue-800'
               }">${s.key === '0' ? '原曲' : 'キー ' + s.key}</span>
-              <button onclick="openEditModal('${s.id}')" class="text-slate-400 hover:text-indigo-400 p-1.5 text-xs" title="編集">✏️</button>
-              <button onclick="deleteSong('${s.id}')" class="text-slate-500 hover:text-rose-400 p-1.5 text-xs" title="削除">🗑️</button>
+              <button onclick="openEditModal('${s.id}')" class="text-slate-400 hover:text-indigo-400 p-1.5 text-xs">✏️</button>
+              <button onclick="deleteSong('${s.id}')" class="text-slate-500 hover:text-rose-400 p-1.5 text-xs">🗑️</button>
             </div>
           </div>
 
-          ${s.memo ? `<div class="text-xs text-slate-300 bg-slate-950/70 p-2 rounded-lg border border-slate-800/60 leading-relaxed">${s.memo}</div>` : ''}
+          ${s.memo ? `<div class="text-xs text-slate-300 bg-slate-950/70 p-2 rounded-lg border border-slate-800/60 leading-relaxed">${escapeHtml(s.memo)}</div>` : ''}
 
           <div class="flex items-center justify-between pt-1 gap-2 border-t border-slate-800/50 text-[11px]">
-            <div class="flex items-center gap-2 flex-wrap">
-              <button onclick="recordSung('${s.id}')" class="text-indigo-400 hover:text-indigo-300 bg-indigo-950/50 hover:bg-indigo-950 border border-indigo-900/60 px-2 py-0.5 rounded-md flex items-center gap-1 font-medium transition">
+            <div class="flex items-center gap-2">
+              <button onclick="recordSung('${s.id}')" class="text-indigo-400 hover:text-indigo-300 bg-indigo-950/50 hover:bg-indigo-950 border border-indigo-900/60 px-2 py-0.5 rounded-md font-medium transition">
                 🎤 歌った！
               </button>
               <span class="text-slate-500">${formatDate(s.lastSungAt)}</span>
             </div>
             <div class="flex items-center gap-2">
-              <a href="https://www.youtube.com/results?search_query=${encodeURIComponent((s.artist ? s.artist + ' ' : '') + s.title)}" target="_blank" rel="noopener" class="text-slate-400 hover:text-red-400" title="YouTubeで探す">▶️ YT</a>
-              <a href="https://www.google.com/search?q=${encodeURIComponent(s.title + ' ' + (s.artist || '') + ' 歌詞')}" target="_blank" rel="noopener" class="text-slate-400 hover:text-sky-400" title="歌詞を検索">📄 歌詞</a>
+              <a href="https://www.youtube.com/results?search_query=${encodeURIComponent((s.artist ? s.artist + ' ' : '') + s.title)}" target="_blank" rel="noopener" class="text-slate-400 hover:text-red-400">▶️ YT</a>
+              <a href="https://www.google.com/search?q=${encodeURIComponent(s.title + ' ' + (s.artist || '') + ' 歌詞')}" target="_blank" rel="noopener" class="text-slate-400 hover:text-sky-400">📄 歌詞</a>
             </div>
           </div>
 
           ${s.tags && s.tags.length ? `
             <div class="flex flex-wrap gap-1 mt-0.5">
-              ${s.tags.map(t => `<span class="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-md">#${t}</span>`).join('')}
+              ${s.tags.map(t => `<span class="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-md">#${escapeHtml(t)}</span>`).join('')}
             </div>
           ` : ''}
         </div>
@@ -282,10 +356,9 @@
       render();
     }
 
-    function recordSung(id) {
-      songs = songs.map(s => s.id === id ? { ...s, lastSungAt: Date.now() } : s);
-      saveToStorage();
-      render();
+    async function recordSung(id) {
+      const { doc, updateDoc } = window.firestoreOps;
+      await updateDoc(doc(window.db, "songs", id), { lastSungAt: Date.now() });
     }
 
     function openModal() {
@@ -297,6 +370,8 @@
       document.getElementById('formScore').value = '歌える';
       document.getElementById('formTags').value = '';
       document.getElementById('formMemo').value = '';
+      document.getElementById('apiSearchInput').value = '';
+      document.getElementById('apiSearchResults').classList.add('hidden');
       document.getElementById('modal').classList.remove('hidden');
     }
 
@@ -305,12 +380,13 @@
       if (!s) return;
       document.getElementById('editSongId').value = s.id;
       document.getElementById('modalTitle').textContent = '✏️ 曲を編集';
-      document.getElementById('formTitle').value = s.title;
+      document.getElementById('formTitle').value = s.title || '';
       document.getElementById('formArtist').value = s.artist || '';
       document.getElementById('formKey').value = s.key || '0';
       document.getElementById('formScore').value = s.score || '歌える';
       document.getElementById('formTags').value = (s.tags || []).join(', ');
       document.getElementById('formMemo').value = s.memo || '';
+      document.getElementById('apiSearchResults').classList.add('hidden');
       document.getElementById('modal').classList.remove('hidden');
     }
 
@@ -318,7 +394,7 @@
       document.getElementById('modal').classList.add('hidden');
     }
 
-    function handleSave(e) {
+    async function handleSave(e) {
       e.preventDefault();
       const editId = document.getElementById('editSongId').value;
       const tags = document.getElementById('formTags').value
@@ -326,47 +402,37 @@
         .map(t => t.trim())
         .filter(Boolean);
 
-      if (editId) {
-        // 編集
-        songs = songs.map(s => s.id === editId ? {
-          ...s,
-          title: document.getElementById('formTitle').value,
-          artist: document.getElementById('formArtist').value,
-          key: document.getElementById('formKey').value,
-          score: document.getElementById('formScore').value,
-          tags: tags,
-          memo: document.getElementById('formMemo').value,
-        } : s);
-      } else {
-        // 新規登録
-        const newSong = {
-          id: Date.now().toString(),
-          title: document.getElementById('formTitle').value,
-          artist: document.getElementById('formArtist').value,
-          key: document.getElementById('formKey').value,
-          score: document.getElementById('formScore').value,
-          tags: tags,
-          memo: document.getElementById('formMemo').value,
-          lastSungAt: null
-        };
-        songs.unshift(newSong);
-      }
+      const songData = {
+        title: document.getElementById('formTitle').value,
+        artist: document.getElementById('formArtist').value,
+        key: document.getElementById('formKey').value,
+        score: document.getElementById('formScore').value,
+        tags: tags,
+        memo: document.getElementById('formMemo').value,
+      };
 
-      saveToStorage();
-      render();
+      const { collection, addDoc, doc, updateDoc } = window.firestoreOps;
+
+      if (editId) {
+        await updateDoc(doc(window.db, "songs", editId), songData);
+      } else {
+        await addDoc(collection(window.db, "songs"), {
+          ...songData,
+          createdAt: Date.now(),
+          lastSungAt: null
+        });
+      }
       closeModal();
     }
 
-    function deleteSong(id) {
+    async function deleteSong(id) {
       if (confirm('この曲を削除しますか？')) {
-        songs = songs.filter(s => s.id !== id);
-        saveToStorage();
-        render();
+        const { doc, deleteDoc } = window.firestoreOps;
+        await deleteDoc(doc(window.db, "songs", id));
       }
     }
 
     function pickRandom() {
-      const query = document.getElementById('searchInput').value.toLowerCase();
       let pool = songs.filter(s => {
         const matchesTag = selectedTag ? s.tags && s.tags.includes(selectedTag) : true;
         const matchesScore = selectedScore === 'all' ? true : s.score === selectedScore;
@@ -385,43 +451,6 @@
     function closeRandom() {
       document.getElementById('randomBanner').classList.add('hidden');
     }
-
-    function toggleSettings() {
-      document.getElementById('settingsModal').classList.toggle('hidden');
-    }
-
-    function exportData() {
-      const blob = new Blob([JSON.stringify(songs, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `karaoke_songs_${new Date().toISOString().slice(0,10)}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-
-    function importData(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = function(evt) {
-        try {
-          const imported = JSON.parse(evt.target.result);
-          if (Array.isArray(imported)) {
-            songs = imported;
-            saveToStorage();
-            render();
-            alert('復元が完了しました！');
-            toggleSettings();
-          }
-        } catch(err) {
-          alert('ファイルの読み込みに失敗しました');
-        }
-      };
-      reader.readAsText(file);
-    }
-
-    render();
   </script>
 </body>
 </html>
