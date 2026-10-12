@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>マイカラオケリスト</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { -webkit-tap-highlight-color: transparent; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen pb-24 font-sans">
+
+  <!-- ヘッダー -->
+  <header class="sticky top-0 z-20 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 py-3">
+    <div class="max-w-md mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="text-xl">🎤</span>
+        <h1 class="text-lg font-bold tracking-tight">カラオケリスト</h1>
+      </div>
+      <button onclick="openModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow transition flex items-center gap-1">
+        ＋ 追加
+      </button>
+    </div>
+  </header>
+
+  <main class="max-w-md mx-auto p-4 space-y-4">
+    <!-- 検索 & ランダム -->
+    <div class="flex gap-2">
+      <input type="text" id="searchInput" oninput="render()" placeholder="曲名・歌手・タグで検索..." class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500">
+      <button onclick="pickRandom()" class="bg-slate-800 border border-slate-700 px-3.5 py-2.5 rounded-xl text-lg hover:bg-slate-700 transition" title="ランダム選曲">
+        🎲
+      </button>
+    </div>
+
+    <!-- タグ一覧 -->
+    <div id="tagList" class="flex gap-1.5 overflow-x-auto pb-1 text-xs"></div>
+
+    <!-- ランダム選曲結果 -->
+    <div id="randomBanner" class="hidden bg-indigo-950/80 border border-indigo-500/50 p-4 rounded-2xl relative shadow-lg">
+      <div class="text-xs font-bold text-indigo-400 mb-1">🎲 次に歌うおすすめ！</div>
+      <div id="randomTitle" class="text-lg font-bold text-white"></div>
+      <div id="randomArtist" class="text-sm text-slate-300"></div>
+      <div id="randomKey" class="mt-2 text-xs font-semibold text-indigo-200"></div>
+      <button onclick="closeRandom()" class="absolute top-3 right-3 text-slate-400 text-xs px-2 py-1">✕</button>
+    </div>
+
+    <!-- 曲一覧 -->
+    <div id="songList" class="space-y-3"></div>
+  </main>
+
+  <!-- 追加モーダル -->
+  <div id="modal" class="fixed inset-0 z-50 bg-black/70 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-800 border border-slate-700 w-full max-w-sm rounded-2xl p-5 shadow-2xl">
+      <h2 class="text-base font-bold mb-4 flex items-center gap-1">🎵 曲を登録</h2>
+      <form onsubmit="handleSave(event)" class="space-y-3 text-sm">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">曲名 *</label>
+          <input type="text" id="formTitle" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-100 focus:outline-none focus:border-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">歌手名</label>
+          <input type="text" id="formArtist" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-100 focus:outline-none focus:border-indigo-500">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">キー調整</label>
+            <select id="formKey" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-100">
+              <option value="0">原曲キー (0)</option>
+              <option value="-1">-1</option>
+              <option value="-2">-2</option>
+              <option value="-3">-3</option>
+              <option value="-4">-4</option>
+              <option value="+1">+1</option>
+              <option value="+2">+2</option>
+              <option value="+3">+3</option>
+              <option value="+4">+4</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">完成度</label>
+            <select id="formScore" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-100">
+              <option value="得意">得意</option>
+              <option value="歌える">歌える</option>
+              <option value="練習中">練習中</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">タグ（カンマ区切り）</label>
+          <input type="text" id="formTags" placeholder="盛り上がる, アニソン, バラード" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-100">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">メモ</label>
+          <textarea id="formMemo" rows="2" placeholder="サビ高音、歌い出しの音など" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-100 resize-none"></textarea>
+        </div>
+        <div class="flex gap-2 pt-2">
+          <button type="button" onclick="closeModal()" class="flex-1 bg-slate-700 text-slate-300 py-2.5 rounded-lg font-bold">キャンセル</button>
+          <button type="submit" class="flex-1 bg-indigo-600 text-white py-2.5 rounded-lg font-bold">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const INITIAL_DATA = [
+      { id: '1', title: '怪獣の花唄', artist: 'Vaundy', key: '0', score: '得意', tags: ['盛り上がる'], memo: 'サビは息継ぎ意識' },
+      { id: '2', title: 'ドライフラワー', artist: '優里', key: '-1', score: '歌える', tags: ['バラード'], memo: '後半の転調注意' }
+    ];
+
+    let songs = JSON.parse(localStorage.getItem('karaoke_list')) || INITIAL_DATA;
+    let selectedTag = null;
+
+    function saveToStorage() {
+      localStorage.setItem('karaoke_list', JSON.stringify(songs));
+    }
+
+    function render() {
+      const query = document.getElementById('searchInput').value.toLowerCase();
+      const filtered = songs.filter(s => {
+        const matchesQuery = s.title.toLowerCase().includes(query) || 
+                             s.artist.toLowerCase().includes(query) || 
+                             (s.tags && s.tags.some(t => t.toLowerCase().includes(query)));
+        const matchesTag = selectedTag ? s.tags && s.tags.includes(selectedTag) : true;
+        return matchesQuery && matchesTag;
+      });
+
+      // タグ描画
+      const allTags = Array.from(new Set(songs.flatMap(s => s.tags || [])));
+      const tagContainer = document.getElementById('tagList');
+      tagContainer.innerHTML = '';
+      if (allTags.length > 0) {
+        tagContainer.innerHTML += `<button onclick="setFilterTag(null)" class="px-2.5 py-1 rounded-full whitespace-nowrap transition ${selectedTag === null ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'}">すべて</button>`;
+        allTags.forEach(tag => {
+          tagContainer.innerHTML += `<button onclick="setFilterTag('${tag}')" class="px-2.5 py-1 rounded-full whitespace-nowrap transition ${selectedTag === tag ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'}">#${tag}</button>`;
+        });
+      }
+
+      // リスト描画
+      const listContainer = document.getElementById('songList');
+      if (filtered.length === 0) {
+        listContainer.innerHTML = '<div class="text-center text-slate-500 py-10 text-sm">曲がありません</div>';
+        return;
+      }
+
+      listContainer.innerHTML = filtered.map(s => `
+        <div class="bg-slate-800/90 border border-slate-700/80 p-3.5 rounded-2xl flex flex-col gap-2 shadow-sm">
+          <div class="flex justify-between items-start">
+            <div>
+              <div class="font-bold text-base text-white flex items-center gap-2">
+                ${s.title}
+                <span class="text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                  s.score === '得意' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' :
+                  s.score === '歌える' ? 'bg-sky-950 text-sky-400 border border-sky-800' :
+                  'bg-amber-950 text-amber-400 border border-amber-800'
+                }">${s.score}</span>
+              </div>
+              <div class="text-xs text-slate-400">${s.artist || '歌手未設定'}</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs px-2 py-0.5 rounded-md font-mono font-bold ${
+                s.key === '0' ? 'bg-slate-700 text-slate-300' :
+                s.key.startsWith('+') ? 'bg-rose-950 text-rose-300 border border-rose-800' :
+                'bg-blue-950 text-blue-300 border border-blue-800'
+              }">${s.key === '0' ? '原曲' : 'キー ' + s.key}</span>
+              <button onclick="deleteSong('${s.id}')" class="text-slate-500 hover:text-rose-400 p-1 text-sm">✕</button>
+            </div>
+          </div>
+          ${s.memo ? `<div class="text-xs text-slate-300 bg-slate-900/60 p-2 rounded-lg">${s.memo}</div>` : ''}
+          ${s.tags && s.tags.length ? `
+            <div class="flex flex-wrap gap-1">
+              ${s.tags.map(t => `<span class="text-[10px] bg-slate-700/60 text-slate-300 px-2 py-0.5 rounded">#${t}</span>`).join('')}
+            </div>
+          ` : ''}
+        </div>
+      `).join('');
+    }
+
+    function setFilterTag(tag) {
+      selectedTag = tag;
+      render();
+    }
+
+    function openModal() { document.getElementById('modal').classList.remove('hidden'); }
+    function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+
+    function handleSave(e) {
+      e.preventDefault();
+      const tags = document.getElementById('formTags').value
+        .split(/[\s,、]+/)
+        .map(t => t.trim())
+        .filter(Boolean);
+
+      const newSong = {
+        id: Date.now().toString(),
+        title: document.getElementById('formTitle').value,
+        artist: document.getElementById('formArtist').value,
+        key: document.getElementById('formKey').value,
+        score: document.getElementById('formScore').value,
+        tags: tags,
+        memo: document.getElementById('formMemo').value,
+      };
+
+      songs.unshift(newSong);
+      saveToStorage();
+      render();
+      closeModal();
+      e.target.reset();
+    }
+
+    function deleteSong(id) {
+      if (confirm('この曲を削除しますか？')) {
+        songs = songs.filter(s => s.id !== id);
+        saveToStorage();
+        render();
+      }
+    }
+
+    function pickRandom() {
+      if (songs.length === 0) return;
+      const pick = songs[Math.floor(Math.random() * songs.length)];
+      document.getElementById('randomTitle').textContent = pick.title;
+      document.getElementById('randomArtist').textContent = pick.artist || '歌手未設定';
+      document.getElementById('randomKey').textContent = 'キー: ' + (pick.key === '0' ? '原曲キー' : pick.key);
+      document.getElementById('randomBanner').classList.remove('hidden');
+    }
+
+    function closeRandom() {
+      document.getElementById('randomBanner').classList.add('hidden');
+    }
+
+    render();
+  </script>
+</body>
+</html>
