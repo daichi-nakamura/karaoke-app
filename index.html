@@ -239,140 +239,195 @@
     </div>
   </div>
 
-  <!-- 追加・編集モーダル -->
+  <!-- 追加・編集モーダル（単曲 / まとめて一括登録タブ付き） -->
   <div id="modal" class="fixed inset-0 z-50 bg-black/75 hidden flex items-center justify-center p-4 overflow-y-auto">
     <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-5 shadow-2xl my-auto space-y-3">
-      <h2 id="modalTitle" class="text-base font-bold flex items-center gap-1.5 text-white">🎵 曲を登録</h2>
       
-      <!-- iTunes自動取得セクション -->
-      <div class="bg-slate-950 border border-slate-800 p-2.5 rounded-xl space-y-2">
-        <div class="text-[11px] font-bold text-indigo-400">⚡ iTunesで検索（歌手・曲名から最大50曲）</div>
-        <div class="flex gap-1.5">
-          <input type="text" id="apiSearchInput" placeholder="歌手名や曲名を入力..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-slate-600 focus:outline-none">
-          <button type="button" onclick="searchITunes()" class="bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap">検索</button>
+      <!-- モーダルヘッダー & タブ切り替え -->
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+        <h2 id="modalTitle" class="text-sm font-bold flex items-center gap-1 text-white">🎵 曲を登録</h2>
+        <div id="modalTabContainer" class="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-xs">
+          <button id="modalTabSingle" type="button" onclick="switchModalTab('single')" class="px-2 py-1 rounded-md font-bold bg-indigo-600 text-white">
+            単曲
+          </button>
+          <button id="modalTabBulk" type="button" onclick="switchModalTab('bulk')" class="px-2 py-1 rounded-md font-bold text-slate-400 hover:text-white">
+            📋 まとめて一括
+          </button>
         </div>
-        
-        <div id="apiSortRow" class="hidden flex items-center justify-between text-[11px] text-slate-400 pt-1">
-          <span id="apiResultCount">0件</span>
-          <div class="flex items-center gap-1">
-            <span>並び順:</span>
-            <select id="apiSortSelect" onchange="renderITunesResults()" class="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-slate-200 text-[10px] focus:outline-none">
-              <option value="default">人気・関連度順</option>
-              <option value="title">曲名順 (あいうえお)</option>
-              <option value="yearDesc">リリース年が新しい順</option>
-              <option value="yearAsc">リリース年が古い順</option>
-            </select>
-          </div>
-        </div>
-
-        <div id="apiSearchResults" class="max-h-52 overflow-y-auto no-scrollbar space-y-1.5 hidden"></div>
       </div>
 
-      <form onsubmit="handleSave(event)" class="space-y-3 text-sm">
-        <input type="hidden" id="editSongId" value="">
-        <input type="hidden" id="formArtwork" value="">
-        <input type="hidden" id="formPreviewUrl" value="">
-        <input type="hidden" id="formDuration" value="">
-        <input type="hidden" id="formDurationMs" value="">
-        <input type="hidden" id="formLastSungAt" value="">
-        <input type="hidden" id="formSingCount" value="0">
+      <!-- ==================== パネルA: 単曲登録フォーム ==================== -->
+      <div id="modalPanelSingle" class="space-y-3">
+        <!-- iTunes自動取得セクション -->
+        <div class="bg-slate-950 border border-slate-800 p-2.5 rounded-xl space-y-2">
+          <div class="text-[11px] font-bold text-indigo-400">⚡ iTunesで検索（歌手・曲名から最大50曲）</div>
+          <div class="flex gap-1.5">
+            <input type="text" id="apiSearchInput" placeholder="歌手名や曲名を入力..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-slate-600 focus:outline-none">
+            <button type="button" onclick="searchITunes()" class="bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap">検索</button>
+          </div>
+          
+          <div id="apiSortRow" class="hidden flex items-center justify-between text-[11px] text-slate-400 pt-1">
+            <span id="apiResultCount">0件</span>
+            <div class="flex items-center gap-1">
+              <span>並び順:</span>
+              <select id="apiSortSelect" onchange="renderITunesResults()" class="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-slate-200 text-[10px] focus:outline-none">
+                <option value="default">人気・関連度順</option>
+                <option value="title">曲名順 (あいうえお)</option>
+                <option value="yearDesc">リリース年が新しい順</option>
+                <option value="yearAsc">リリース年が古い順</option>
+              </select>
+            </div>
+          </div>
 
-        <div class="grid grid-cols-3 gap-2">
-          <div class="col-span-2">
-            <label class="block text-xs text-slate-400 mb-1">曲名 *</label>
-            <input type="text" id="formTitle" required placeholder="例: 白日" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500">
-          </div>
-          <div>
-            <label class="block text-xs text-slate-400 mb-1">リリース年</label>
-            <input type="number" id="formYear" placeholder="2019" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500">
-          </div>
+          <div id="apiSearchResults" class="max-h-52 overflow-y-auto no-scrollbar space-y-1.5 hidden"></div>
         </div>
 
-        <div class="grid grid-cols-2 gap-2">
-          <div>
-            <label class="block text-xs text-slate-400 mb-1">歌手名</label>
-            <input type="text" id="formArtist" placeholder="例: King Gnu" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500">
+        <form onsubmit="handleSave(event)" class="space-y-3 text-sm">
+          <input type="hidden" id="editSongId" value="">
+          <input type="hidden" id="formArtwork" value="">
+          <input type="hidden" id="formPreviewUrl" value="">
+          <input type="hidden" id="formDuration" value="">
+          <input type="hidden" id="formDurationMs" value="">
+          <input type="hidden" id="formLastSungAt" value="">
+          <input type="hidden" id="formSingCount" value="0">
+
+          <div class="grid grid-cols-3 gap-2">
+            <div class="col-span-2">
+              <label class="block text-xs text-slate-400 mb-1">曲名 *</label>
+              <input type="text" id="formTitle" required placeholder="例: 白日" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">リリース年</label>
+              <input type="number" id="formYear" placeholder="2019" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500">
+            </div>
           </div>
-          <div>
-            <label class="block text-xs text-slate-400 mb-1">ジャンル</label>
-            <input type="text" id="formGenre" placeholder="例: J-Pop, アニメ, ロック" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500">
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">歌手名</label>
+              <input type="text" id="formArtist" placeholder="例: King Gnu" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">ジャンル</label>
+              <input type="text" id="formGenre" placeholder="例: J-Pop, アニメ, ロック" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500">
+            </div>
           </div>
+
+          <!-- 音域設定 -->
+          <div class="grid grid-cols-2 gap-2 bg-slate-950/60 p-2 rounded-xl border border-slate-800/80">
+            <div>
+              <label class="block text-[11px] text-amber-400 mb-1">🔥 最高音</label>
+              <input type="text" id="formMaxPitch" placeholder="例: hiA, mid2G" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-500">
+            </div>
+            <div>
+              <label class="block text-[11px] text-sky-400 mb-1">💧 最低音</label>
+              <input type="text" id="formMinPitch" placeholder="例: mid1D, lowG" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-sky-500">
+            </div>
+          </div>
+
+          <!-- キー設定 & 精密採点ベストスコア -->
+          <div class="grid grid-cols-3 gap-2">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">キー設定</label>
+              <select id="formKey" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 focus:outline-none">
+                <option value="-6">-6</option>
+                <option value="-5">-5</option>
+                <option value="-4">-4</option>
+                <option value="-3">-3</option>
+                <option value="-2">-2</option>
+                <option value="-1">-1</option>
+                <option value="0" selected>原曲 (0)</option>
+                <option value="+1">+1</option>
+                <option value="+2">+2</option>
+                <option value="+3">+3</option>
+                <option value="+4">+4</option>
+                <option value="+5">+5</option>
+                <option value="+6">+6</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">完成度</label>
+              <select id="formScore" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 focus:outline-none">
+                <option value="得意">得意</option>
+                <option value="歌える" selected>歌える</option>
+                <option value="練習中">練習中</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-amber-400 mb-1">🎯 ベスト点数</label>
+              <input type="number" step="0.001" id="formScoreVal" placeholder="92.5" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">歌唱タイプ</label>
+              <select id="formDuetType" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 focus:outline-none">
+                <option value="solo" selected>ソロ (通常)</option>
+                <option value="duet">👥 デュエット・合唱</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">タグ（カンマ区切り）</label>
+              <input type="text" id="formTags" placeholder="盛り上がる, バラード 等" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">メモ（歌い出し・サビ高音など）</label>
+            <textarea id="formMemo" rows="2" placeholder="サビのブレス位置、裏声の切り替えなど" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 resize-none focus:outline-none focus:border-indigo-500"></textarea>
+          </div>
+
+          <div id="resetSungRow" class="hidden pt-1">
+            <button type="button" onclick="clearSungHistory()" class="text-xs text-slate-400 hover:text-rose-400 underline">歌唱履歴・回数をクリアする</button>
+          </div>
+
+          <div class="flex gap-2 pt-1">
+            <button type="button" onclick="closeModal()" class="flex-1 bg-slate-800 text-slate-300 py-2.5 rounded-lg font-bold">キャンセル</button>
+            <button type="submit" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-lg font-bold transition">保存</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- ==================== パネルB: まとめて一括登録 ==================== -->
+      <div id="modalPanelBulk" class="space-y-3 hidden">
+        <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 text-[11px] text-slate-400 space-y-1">
+          <div class="text-indigo-400 font-bold">📋 曲名リストを貼り付けて一括取得</div>
+          <p>改行区切りで曲名を入力してください。「曲名 歌手名」や「1. 曲名」の貼り付けにも対応しています。</p>
         </div>
 
-        <!-- 音域設定 -->
-        <div class="grid grid-cols-2 gap-2 bg-slate-950/60 p-2 rounded-xl border border-slate-800/80">
-          <div>
-            <label class="block text-[11px] text-amber-400 mb-1">🔥 最高音</label>
-            <input type="text" id="formMaxPitch" placeholder="例: hiA, mid2G" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-500">
-          </div>
-          <div>
-            <label class="block text-[11px] text-sky-400 mb-1">💧 最低音</label>
-            <input type="text" id="formMinPitch" placeholder="例: mid1D, lowG" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-sky-500">
-          </div>
+        <textarea id="bulkTextInput" rows="5" placeholder="白日 King Gnu&#10;Lemon 米津玄師&#10;怪獣の花唄&#10;天体観測&#10;丸の内サディスティック" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 leading-relaxed"></textarea>
+
+        <div class="flex gap-2">
+          <button type="button" id="btnBulkSearch" onclick="processBulkSearch()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1">
+            <span>⚡ 一括検索して確認</span>
+          </button>
+          <button type="button" onclick="document.getElementById('bulkTextInput').value=''" class="px-3 bg-slate-800 text-slate-400 hover:text-white py-2 rounded-lg text-xs font-semibold">
+            クリア
+          </button>
         </div>
 
-        <!-- キー設定 & 精密採点ベストスコア -->
-        <div class="grid grid-cols-3 gap-2">
-          <div>
-            <label class="block text-xs text-slate-400 mb-1">キー設定</label>
-            <select id="formKey" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 focus:outline-none">
-              <option value="-6">-6</option>
-              <option value="-5">-5</option>
-              <option value="-4">-4</option>
-              <option value="-3">-3</option>
-              <option value="-2">-2</option>
-              <option value="-1">-1</option>
-              <option value="0" selected>原曲 (0)</option>
-              <option value="+1">+1</option>
-              <option value="+2">+2</option>
-              <option value="+3">+3</option>
-              <option value="+4">+4</option>
-              <option value="+5">+5</option>
-              <option value="+6">+6</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs text-slate-400 mb-1">完成度</label>
-            <select id="formScore" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 focus:outline-none">
-              <option value="得意">得意</option>
-              <option value="歌える" selected>歌える</option>
-              <option value="練習中">練習中</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs text-amber-400 mb-1">🎯 ベスト点数</label>
-            <input type="number" step="0.001" id="formScoreVal" placeholder="92.5" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-500">
-          </div>
-        </div>
+        <!-- 進捗表示 -->
+        <div id="bulkProgress" class="text-[11px] text-indigo-300 hidden text-center py-1"></div>
 
-        <div class="grid grid-cols-2 gap-2">
-          <div>
-            <label class="block text-xs text-slate-400 mb-1">歌唱タイプ</label>
-            <select id="formDuetType" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 focus:outline-none">
-              <option value="solo" selected>ソロ (通常)</option>
-              <option value="duet">👥 デュエット・合唱</option>
-            </select>
+        <!-- プレビュー確認リスト -->
+        <div id="bulkPreviewArea" class="hidden space-y-2 pt-1">
+          <div class="flex justify-between items-center text-[11px] text-slate-400 px-0.5">
+            <span id="bulkFoundCount">0件取得</span>
+            <span class="text-[10px] text-slate-500">不要な曲は✕で除外</span>
           </div>
-          <div>
-            <label class="block text-xs text-slate-400 mb-1">タグ（カンマ区切り）</label>
-            <input type="text" id="formTags" placeholder="盛り上がる, バラード 等" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500">
+
+          <div id="bulkPreviewList" class="max-h-48 overflow-y-auto no-scrollbar space-y-1.5"></div>
+
+          <div class="flex gap-2 pt-2 border-t border-slate-800">
+            <button type="button" onclick="closeModal()" class="flex-1 bg-slate-800 text-slate-300 py-2.5 rounded-lg text-xs font-bold">キャンセル</button>
+            <button type="button" id="btnBulkSave" onclick="saveBulkSongs()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-lg text-xs font-bold transition">
+              一括保存する
+            </button>
           </div>
         </div>
+      </div>
 
-        <div>
-          <label class="block text-xs text-slate-400 mb-1">メモ（歌い出し・サビ高音など）</label>
-          <textarea id="formMemo" rows="2" placeholder="サビのブレス位置、裏声の切り替えなど" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 resize-none focus:outline-none focus:border-indigo-500"></textarea>
-        </div>
-
-        <div id="resetSungRow" class="hidden pt-1">
-          <button type="button" onclick="clearSungHistory()" class="text-xs text-slate-400 hover:text-rose-400 underline">歌唱履歴・回数をクリアする</button>
-        </div>
-
-        <div class="flex gap-2 pt-1">
-          <button type="button" onclick="closeModal()" class="flex-1 bg-slate-800 text-slate-300 py-2.5 rounded-lg font-bold">キャンセル</button>
-          <button type="submit" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-lg font-bold transition">保存</button>
-        </div>
-      </form>
     </div>
   </div>
 
@@ -438,6 +493,7 @@
     let rankingSongs = [];
     let recommendedSongs = [];
     let currentRawITunesResults = [];
+    let bulkCandidateSongs = [];
     let setlist = JSON.parse(localStorage.getItem('karaoke_setlist')) || [];
     let selectedGenre = null;
     let selectedTag = null;
@@ -486,6 +542,210 @@
       return duetPatterns.some(pattern => target.includes(pattern));
     }
 
+    // ==================== モーダル内タブ切り替え（単曲 / 一括） ====================
+    window.switchModalTab = function(mode) {
+      const tabSingle = document.getElementById('modalTabSingle');
+      const tabBulk = document.getElementById('modalTabBulk');
+      const panelSingle = document.getElementById('modalPanelSingle');
+      const panelBulk = document.getElementById('modalPanelBulk');
+
+      if (mode === 'single') {
+        tabSingle.className = "px-2 py-1 rounded-md font-bold bg-indigo-600 text-white";
+        tabBulk.className = "px-2 py-1 rounded-md font-bold text-slate-400 hover:text-white";
+        panelSingle.classList.remove('hidden');
+        panelBulk.classList.add('hidden');
+      } else {
+        tabBulk.className = "px-2 py-1 rounded-md font-bold bg-indigo-600 text-white";
+        tabSingle.className = "px-2 py-1 rounded-md font-bold text-slate-400 hover:text-white";
+        panelBulk.classList.remove('hidden');
+        panelSingle.classList.add('hidden');
+      }
+    };
+
+    // ==================== 一括テキスト自動検索 & 登録ロジック ====================
+    window.processBulkSearch = async function() {
+      const rawText = document.getElementById('bulkTextInput').value.trim();
+      if (!rawText) {
+        alert("曲名を入力または貼り付けてください。");
+        return;
+      }
+
+      // 改行で分割し、箇条書き記号や番号を除去
+      const lines = rawText.split('\n')
+        .map(l => l.replace(/^[\d\.\-\*・\s]+/, '').trim())
+        .filter(Boolean);
+
+      if (lines.length === 0) {
+        alert("有効な曲名が見つかりませんでした。");
+        return;
+      }
+
+      const progressEl = document.getElementById('bulkProgress');
+      const previewArea = document.getElementById('bulkPreviewArea');
+      const btnSearch = document.getElementById('btnBulkSearch');
+
+      btnSearch.disabled = true;
+      btnSearch.classList.add('opacity-50');
+      progressEl.classList.remove('hidden');
+      previewArea.classList.add('hidden');
+      bulkCandidateSongs = [];
+
+      const existingSet = new Set((window.songs || []).map(s => `${(s.title || '').toLowerCase()}_${(s.artist || '').toLowerCase()}`));
+
+      for (let i = 0; i < lines.length; i++) {
+        const queryTerm = lines[i];
+        progressEl.textContent = `⏳ iTunesで検索中 (${i + 1}/${lines.length}): ${queryTerm}`;
+
+        try {
+          const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(queryTerm)}&country=jp&entity=song&limit=1`);
+          const data = await res.json();
+
+          if (data.results && data.results.length > 0) {
+            const item = data.results[0];
+            const year = item.releaseDate ? item.releaseDate.substring(0, 4) : '';
+            const mins = Math.floor((item.trackTimeMillis || 0) / 60000);
+            const secs = Math.floor(((item.trackTimeMillis || 0) % 60000) / 1000).toString().padStart(2, '0');
+            const isDuet = checkIsDuet(item.trackName, item.artistName);
+
+            const tags = [];
+            const yr = parseInt(year, 10);
+            if (yr >= 2020) tags.push('2020年代');
+            else if (yr >= 2010) tags.push('2010年代');
+            else if (yr >= 2000) tags.push('2000年代');
+            else if (yr < 2000) tags.push('90年代以前');
+
+            const isAlreadyAdded = existingSet.has(`${item.trackName.toLowerCase()}_${item.artistName.toLowerCase()}`);
+
+            bulkCandidateSongs.push({
+              title: item.trackName,
+              artist: item.artistName,
+              year: year,
+              genre: item.primaryGenreName || 'J-Pop',
+              artwork: item.artworkUrl100 || '',
+              previewUrl: item.previewUrl || '',
+              duration: item.trackTimeMillis ? `${mins}:${secs}` : '',
+              durationMs: item.trackTimeMillis || 0,
+              isDuet: isDuet,
+              tags: tags,
+              isAlreadyAdded: isAlreadyAdded
+            });
+          } else {
+            // 見つからなかった場合はテキストをそのまま仮登録候補にする
+            bulkCandidateSongs.push({
+              title: queryTerm,
+              artist: '',
+              year: '',
+              genre: 'J-Pop',
+              artwork: '',
+              previewUrl: '',
+              duration: '',
+              durationMs: 0,
+              isDuet: false,
+              tags: [],
+              isAlreadyAdded: false,
+              notFound: true
+            });
+          }
+        } catch (err) {
+          console.error(err);
+        }
+
+        await new Promise(r => setTimeout(r, 200));
+      }
+
+      btnSearch.disabled = false;
+      btnSearch.classList.remove('opacity-50');
+      progressEl.classList.add('hidden');
+      previewArea.classList.remove('hidden');
+
+      renderBulkPreview();
+    };
+
+    function renderBulkPreview() {
+      const container = document.getElementById('bulkPreviewList');
+      const countEl = document.getElementById('bulkFoundCount');
+      const btnSave = document.getElementById('btnBulkSave');
+
+      const validCount = bulkCandidateSongs.filter(s => !s.isAlreadyAdded).length;
+      countEl.textContent = `候補: ${bulkCandidateSongs.length}件 (保存対象: ${validCount}件)`;
+      btnSave.textContent = `${validCount}曲を一括登録する`;
+      btnSave.disabled = validCount === 0;
+
+      container.innerHTML = bulkCandidateSongs.map((s, idx) => {
+        return `
+          <div class="flex items-center justify-between gap-2 p-2 bg-slate-950 border border-slate-800 rounded-xl text-xs">
+            <div class="flex items-center gap-2 min-w-0">
+              ${s.artwork ? `
+                <img src="${s.artwork}" class="w-9 h-9 rounded-lg object-cover shrink-0 bg-slate-800">
+              ` : `
+                <div class="w-9 h-9 rounded-lg bg-slate-800 flex items-center justify-center shrink-0 text-slate-500 text-xs">🎵</div>
+              `}
+              <div class="min-w-0">
+                <div class="font-bold text-white truncate flex items-center gap-1">
+                  <span>${escapeHtml(s.title)}</span>
+                  ${s.isAlreadyAdded ? '<span class="text-[9px] bg-slate-800 text-slate-400 px-1 rounded">登録済</span>' : ''}
+                  ${s.notFound ? '<span class="text-[9px] bg-amber-950 text-amber-400 px-1 rounded">情報なし</span>' : ''}
+                </div>
+                <div class="text-[10px] text-slate-400 truncate">${escapeHtml(s.artist) || '歌手未設定'} ${s.year ? '• ' + s.year + '年' : ''}</div>
+              </div>
+            </div>
+            <button type="button" onclick="removeBulkCandidate(${idx})" class="text-slate-500 hover:text-rose-400 p-1 shrink-0">✕</button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    window.removeBulkCandidate = function(idx) {
+      bulkCandidateSongs.splice(idx, 1);
+      renderBulkPreview();
+    };
+
+    window.saveBulkSongs = async function() {
+      if (!window.firestoreOps) {
+        alert("データベースに接続されていません。");
+        return;
+      }
+
+      const toSave = bulkCandidateSongs.filter(s => !s.isAlreadyAdded);
+      if (toSave.length === 0) {
+        alert("登録対象の曲がありません。");
+        return;
+      }
+
+      const { collection, addDoc } = window.firestoreOps;
+      let count = 0;
+
+      for (const s of toSave) {
+        const songData = {
+          title: s.title,
+          artist: s.artist,
+          year: s.year,
+          genre: s.genre,
+          maxPitch: '',
+          minPitch: '',
+          artwork: s.artwork,
+          previewUrl: s.previewUrl,
+          duration: s.duration,
+          durationMs: s.durationMs,
+          scoreVal: null,
+          duetType: s.isDuet ? 'duet' : 'solo',
+          key: '0',
+          score: '歌える',
+          tags: s.tags,
+          memo: '',
+          singCount: 0,
+          lastSungAt: null,
+          createdAt: Date.now() + count
+        };
+
+        await addDoc(collection(window.db, "songs"), songData);
+        count++;
+      }
+
+      alert(`🎉 ${count}曲を一括登録しました！`);
+      closeModal();
+    };
+
     // ==================== 管理設定モーダル & マイグレーション ====================
     window.openSettingsModal = function() {
       document.getElementById('migrateProgressText').classList.add('hidden');
@@ -496,7 +756,6 @@
       document.getElementById('settingsModal').classList.add('hidden');
     };
 
-    // ⚡ 未設定項目の一括自動補完
     window.startDataMigration = async function() {
       if (!window.firestoreOps || !window.songs || window.songs.length === 0) {
         alert("曲データが存在しないか、DBに接続されていません。");
@@ -506,7 +765,6 @@
       const progressEl = document.getElementById('migrateProgressText');
       const btnEl = document.getElementById('btnMigrate');
       
-      // 補完対象の判定（画像・音源・演奏時間・年代のいずれかが欠けている曲）
       const targets = window.songs.filter(s => !s.artwork || !s.previewUrl || !s.durationMs || !s.year);
       
       if (targets.length === 0) {
@@ -560,7 +818,6 @@
           console.error(`補完失敗: ${s.title}`, err);
         }
 
-        // API負荷軽減の小休止
         await new Promise(r => setTimeout(r, 250));
       }
 
@@ -570,7 +827,6 @@
       alert(`補完が完了しました！\n更新された曲数: ${updatedCount}件`);
     };
 
-    // 💾 全曲JSONバックアップ
     window.exportBackupJSON = function() {
       if (!window.songs || window.songs.length === 0) {
         alert("バックアップする曲データがありません。");
@@ -586,7 +842,6 @@
       downloadAnchor.remove();
     };
 
-    // 📂 JSONからの復元・インポート
     window.importBackupJSON = function(e) {
       const file = e.target.files[0];
       if (!file) return;
@@ -621,7 +876,6 @@
       e.target.value = '';
     };
 
-    // 🔄 全曲の歌唱履歴・カウンター一括リセット
     window.resetAllSingHistory = async function() {
       if (!confirm("⚠️ 【注意】全曲の歌唱回数（singCount）と歌唱履歴（lastSungAt）をリセットしますか？\n※曲自体や点数・メモは削除されません。")) {
         return;
@@ -641,7 +895,7 @@
       closeSettingsModal();
     };
 
-    // ==================== タブ切り替え ====================
+    // ==================== メインタブ切り替え ====================
     window.switchMainTab = function(tab) {
       const btnMyList = document.getElementById('navTabMyList');
       const btnRecommend = document.getElementById('navTabRecommend');
@@ -988,7 +1242,7 @@
       }).join('');
     }
 
-    // ==================== モーダル & iTunes検索 ====================
+    // ==================== モーダル & iTunes単曲検索 ====================
     window.addFromRanking = function(encoded) {
       const data = JSON.parse(decodeURIComponent(encoded));
       openModal();
@@ -1254,7 +1508,6 @@
         return (b.createdAt || 0) - (a.createdAt || 0);
       });
 
-      // ジャンル別フィルター
       const allGenres = Array.from(new Set((window.songs || []).map(s => s.genre).filter(Boolean)));
       const genreContainer = document.getElementById('genreFilterList');
       genreContainer.innerHTML = '';
@@ -1265,7 +1518,6 @@
         });
       }
 
-      // タグ別フィルター
       const allTags = Array.from(new Set((window.songs || []).flatMap(s => s.tags || [])));
       const tagContainer = document.getElementById('tagFilterList');
       tagContainer.innerHTML = '';
@@ -1479,12 +1731,21 @@
       document.getElementById('apiSortRow').classList.add('hidden');
       document.getElementById('apiSortSelect').value = 'default';
       currentRawITunesResults = [];
+
+      // 一括登録のリセット
+      document.getElementById('bulkTextInput').value = '';
+      document.getElementById('bulkProgress').classList.add('hidden');
+      document.getElementById('bulkPreviewArea').classList.add('hidden');
+      document.getElementById('bulkPreviewList').innerHTML = '';
+      bulkCandidateSongs = [];
     }
 
     window.openModal = function() {
       resetModalInputs();
       document.getElementById('modalTitle').textContent = '🎵 曲を登録';
+      document.getElementById('modalTabContainer').classList.remove('hidden');
       document.getElementById('resetSungRow').classList.add('hidden');
+      switchModalTab('single');
       document.getElementById('modal').classList.remove('hidden');
     };
 
@@ -1495,6 +1756,9 @@
       
       document.getElementById('editSongId').value = s.id;
       document.getElementById('modalTitle').textContent = '✏️ 曲を編集';
+      document.getElementById('modalTabContainer').classList.add('hidden'); // 編集時は単曲固定
+      switchModalTab('single');
+
       document.getElementById('formTitle').value = s.title || '';
       document.getElementById('formArtist').value = s.artist || '';
       document.getElementById('formYear').value = s.year || '';
