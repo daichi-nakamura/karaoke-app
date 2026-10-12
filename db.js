@@ -39,14 +39,22 @@ try {
       const banner = document.getElementById('statusBanner');
       if (banner) banner.classList.add('hidden');
 
+      // window.renderが利用可能なら描画
       if (typeof window.render === 'function') {
-        window.render();
+        try {
+          window.render();
+        } catch (e) {
+          console.error("Render Execution Error:", e);
+        }
       }
       if (typeof window.renderSetlist === 'function') {
-        window.renderSetlist();
+        try {
+          window.renderSetlist();
+        } catch (e) {
+          console.error("RenderSetlist Execution Error:", e);
+        }
       }
 
-      // app.jsに通知
       window.dispatchEvent(new CustomEvent('firestoreDataLoaded'));
     }, (err) => {
       console.error("Firestore Error:", err);
