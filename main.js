@@ -1,4 +1,23 @@
-// main.js
+// main.js - デバッグログ自動表示版
+function logDebug(msg, isError = false) {
+  console.log(msg);
+  let box = document.getElementById('debugLogBox');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'debugLogBox';
+    box.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(20,0,0,0.9);color:#ff7777;font-size:11px;padding:8px;max-height:120px;overflow-y:auto;font-family:monospace;border-bottom:2px solid red;word-break:break-all;';
+    document.body.prepend(box);
+  }
+  const item = document.createElement('div');
+  item.textContent = (isError ? '❌ ' : 'ℹ️ ') + msg;
+  box.appendChild(item);
+}
+
+// 予期せぬスクリプトエラーを画面上にキャッチ
+window.addEventListener('error', (e) => {
+  logDebug(`Script Error: ${e.message} (${e.filename}:${e.lineno})`, true);
+});
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
 import { 
   getFirestore, 
@@ -12,6 +31,8 @@ import {
   orderBy 
 } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
+
+logDebug("main.js 読み込み成功");
 
 // グローバル状態
 window.songs = [];
@@ -1214,7 +1235,7 @@ window.render = function() {
       `;
     }).join('');
   } catch (err) {
-    console.error("Critical Render Error:", err);
+    logDebug("Render Error: " + err.message, true);
   }
 };
 
@@ -1443,35 +1464,39 @@ window.closeRandom = function() {
 // ==================== Firebase 初期化 & 接続 ====================
 try {
   if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY" || !firebaseConfig.projectId) {
+    logDebug("firebaseConfig に設定がありません", true);
     showStatus("⚠️ firebase-config.js にFirebase設定が未入力です。", true);
-    const countEl = document.getElementById('songCount');
-    if (countEl) countEl.textContent = "Firebase設定待ち";
   } else {
+    logDebug(`Firebase初期化開始 (Project: ${firebaseConfig.projectId})`);
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     window.db = db;
     
     const q = query(collection(db, "songs"), orderBy("createdAt", "desc"));
+    logDebug("Firestore onSnapshot 接続リクエスト送信...");
+
     onSnapshot(q, (snapshot) => {
       window.songs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      logDebug(`Firestore受信成功: ${window.songs.length}曲取得`);
+
       const banner = document.getElementById('statusBanner');
       if (banner) banner.classList.add('hidden');
 
-      // データ取得と同時にレンダリングを実行
+      // 取得後即時描画
       window.render();
       window.renderSetlist();
     }, (err) => {
-      console.error("Firestore Error:", err);
+      logDebug(`Firestore通信エラー: ${err.message}`, true);
       showStatus("⚠️ Firestore通信エラー: " + err.message, true);
       const countEl = document.getElementById('songCount');
       if (countEl) countEl.textContent = "通信エラー";
     });
   }
 } catch (e) {
-  console.error("Init Error:", e);
+  logDebug(`Firebase Catch Error: ${e.message}`, true);
   showStatus("⚠️ 初期化エラー: " + e.message, true);
 }
 
-// 初回UI初期化
+// 初回レンダリング
 window.render();
 window.renderSetlist();
