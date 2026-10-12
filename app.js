@@ -42,6 +42,46 @@ const TIE_UP_PRESETS = [
   { title: 'ミュージック・アワー', artist: 'ポルノグラフィティ', year: '2000', tieUp: '🥤 ポカリスエットCMソング' }
 ];
 
+// iTunes API 呼び出し（fetch失敗時はJSONPで確実に取得）
+async function fetchITunesApi(url) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    // CORSやネットワーク制限対策のJSONPフォールバック
+    return new Promise((resolve, reject) => {
+      const cbName = 'itunes_cb_' + Math.random().toString(36).substring(2, 9);
+      const sep = url.includes('?') ? '&' : '?';
+      const script = document.createElement('script');
+      script.src = `${url}${sep}callback=${cbName}`;
+      
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error("通信タイムアウト"));
+      }, 8000);
+
+      function cleanup() {
+        clearTimeout(timeout);
+        delete window[cbName];
+        if (script.parentNode) script.parentNode.removeChild(script);
+      }
+
+      window[cbName] = (data) => {
+        cleanup();
+        resolve(data);
+      };
+
+      script.onerror = () => {
+        cleanup();
+        reject(new Error("iTunes API接続に失敗しました"));
+      };
+
+      document.body.appendChild(script);
+    });
+  }
+}
+
 function saveSetlist() {
   localStorage.setItem('karaoke_setlist', JSON.stringify(setlist));
   renderSetlist();
@@ -109,8 +149,7 @@ window.processBulkSearch = async function() {
     progressEl.textContent = `⏳ iTunesで検索中 (${i + 1}/${rawLines.length}): ${cleanedTerm}`;
 
     try {
-      const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(cleanedTerm)}&country=jp&entity=song&limit=1`);
-      const data = await res.json();
+      const data = await fetchITunesApi(`https://itunes.apple.com/search?term=${encodeURIComponent(cleanedTerm)}&country=jp&entity=song&limit=1`);
 
       if (data.results && data.results.length > 0) {
         const item = data.results[0];
@@ -264,7 +303,7 @@ function renderBulkPreview() {
           <div class="pt-1 border-t border-slate-800">
             <div class="text-[9px] text-indigo-400 font-semibold mb-1">🔍 iTunesから再検索して差し替え</div>
             <div class="flex gap-1">
-              <input type="text" id="reSearchInput_${idx}" placeholder="再検索キーワード..." value="${escapeHtml(s.title + ' ' + (s.artist || ''))}" class="flex-1 bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[10px] text-white">
+              <input type="text" id="reSearchInput_${idx}" placeholder="再検索キーワード..." value="${escapeHtml((s.title || '') + ' ' + (s.artist || ''))}" class="flex-1 bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[10px] text-white">
               <button type="button" onclick="reSearchSingleBulkCandidate(${idx})" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded text-[10px] whitespace-nowrap">再取得</button>
             </div>
           </div>
@@ -295,8 +334,7 @@ window.reSearchSingleBulkCandidate = async function(idx) {
   if (!term) return alert("検索キーワードを入力してください。");
 
   try {
-    const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=jp&entity=song&limit=1`);
-    const data = await res.json();
+    const data = await fetchITunesApi(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=jp&entity=song&limit=1`);
     if (data.results && data.results.length > 0) {
       const item = data.results[0];
       const year = item.releaseDate ? item.releaseDate.substring(0, 4) : '';
@@ -324,7 +362,7 @@ window.reSearchSingleBulkCandidate = async function(idx) {
       alert("該当する曲が見つかりませんでした。別のキーワードでお試しください。");
     }
   } catch (e) {
-    alert("検索エラーが発生しました。");
+    alert("検索エラー: " + e.message);
   }
 };
 
@@ -396,8 +434,7 @@ window.startDataMigration = async function() {
     const s = targets[i];
     progressEl.textContent = `⏳ 補完処理中 (${i + 1}/${targets.length}): ${s.title}`;
     try {
-      const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent((s.title + ' ' + (s.artist || '')).trim())}&country=jp&entity=song&limit=1`);
-      const data = await res.json();
+      const data = await fetchITunesApi(`https://itunes.apple.com/search?term=${encodeURIComponent((s.title + ' ' + (s.artist || '')).trim())}&country=jp&entity=song&limit=1`);
       if (data.results && data.results.length > 0) {
         const hit = data.results[0];
         const patch = {};
@@ -519,8 +556,7 @@ window.togglePlayPreview = async function(url, id, trackName = '', artistName = 
   if (!playableUrl && (trackId || (trackName && artistName))) {
     try {
       const q = trackId ? `https://itunes.apple.com/lookup?id=${trackId}&country=jp` : `https://itunes.apple.com/search?term=${encodeURIComponent(trackName + ' ' + artistName)}&country=jp&entity=song&limit=1`;
-      const res = await fetch(q);
-      const data = await res.json();
+      const data = await fetchITunesApi(q);
       if (data.results && data.results.length > 0 && data.results[0].previewUrl) {
         playableUrl = data.results[0].previewUrl;
       }
@@ -660,8 +696,7 @@ window.analyzeAndRecommend = async function() {
 
   for (const artist of topArtists.slice(0, 2)) {
     try {
-      const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(artist)}&country=jp&entity=song&limit=10`);
-      const data = await res.json();
+      const data = await fetchITunesApi(`https://itunes.apple.com/search?term=${encodeURIComponent(artist)}&country=jp&entity=song&limit=10`);
       (data.results || []).forEach(item => {
         if (!myTitles.has((item.trackName || '').toLowerCase().replace(/\s+/g, ''))) {
           fetchedCandidates.push({
@@ -681,8 +716,7 @@ window.analyzeAndRecommend = async function() {
 
   for (const rArtist of relatedArtists.slice(0, 2)) {
     try {
-      const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(rArtist)}&country=jp&entity=song&limit=5`);
-      const data = await res.json();
+      const data = await fetchITunesApi(`https://itunes.apple.com/search?term=${encodeURIComponent(rArtist)}&country=jp&entity=song&limit=5`);
       (data.results || []).forEach(item => {
         if (!myTitles.has((item.trackName || '').toLowerCase().replace(/\s+/g, ''))) {
           fetchedCandidates.push({
@@ -780,8 +814,7 @@ window.searchITunes = async function() {
   resultBox.innerHTML = '<div class="text-[11px] text-slate-500 py-1">50件取得中...</div>';
 
   try {
-    const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=jp&entity=song&limit=50`);
-    const data = await res.json();
+    const data = await fetchITunesApi(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=jp&entity=song&limit=50`);
     if (!data.results || data.results.length === 0) return resultBox.innerHTML = '<div class="text-[11px] text-slate-500 py-1">曲が見つかりませんでした</div>';
 
     currentRawITunesResults = data.results.map(item => {
@@ -817,7 +850,7 @@ window.searchITunes = async function() {
     sortRow.classList.remove('hidden');
     renderITunesResults();
   } catch (e) {
-    resultBox.innerHTML = '<div class="text-[11px] text-rose-400 py-1">検索に失敗しました</div>';
+    resultBox.innerHTML = `<div class="text-[11px] text-rose-400 py-1">検索に失敗しました: ${e.message}</div>`;
   }
 };
 
@@ -1167,7 +1200,7 @@ window.render = function() {
             <div class="flex items-center justify-between pt-1 gap-1 text-[11px] overflow-x-auto no-scrollbar">
               <div class="flex items-center gap-1.5 shrink-0">
                 ${hasUndo ? `
-                  <button onclick="undoSung('${s.id}')" class="text-amber-400 hover:text-amber-300 bg-amber-950/60 border border-amber-800/80 px-2 py-1 rounded-lg font-medium text-[10px] whitespace-nowrap">
+                  <button onclick="undoSung('${s.id}')" class="text-amber-400 hover:text-amber-300 bg-amber-950/60 border border-amber-800/80 px-1.5 py-1 rounded-lg font-medium text-[10px] whitespace-nowrap">
                     ↩ 歌唱取消
                   </button>
                 ` : ''}
@@ -1209,8 +1242,8 @@ window.setScoreFilter = function(score) {
   selectedScore = score;
   document.querySelectorAll('.score-tab').forEach(b => {
     b.className = b.dataset.val === score 
-      ? 'score-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0 text-xs' 
-      : 'score-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0 text-xs';
+      ? 'score-tab px-2 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0' 
+      : 'score-tab px-2 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0';
   });
   render();
 };
@@ -1218,8 +1251,8 @@ window.setDecadeFilter = function(decade) {
   selectedDecade = decade;
   document.querySelectorAll('.decade-tab').forEach(b => {
     b.className = b.dataset.val === decade 
-      ? 'decade-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0 text-xs' 
-      : 'decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0 text-xs';
+      ? 'decade-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0' 
+      : 'decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0';
   });
   render();
 };
