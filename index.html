@@ -50,6 +50,7 @@
 
   <!-- ==================== 1. マイリスト画面 ==================== -->
   <main id="viewMyList" class="max-w-md mx-auto p-4 space-y-3">
+    <!-- エラー・ステータスバナー -->
     <div id="statusBanner" class="hidden text-xs p-2.5 rounded-xl border"></div>
 
     <!-- 検索バー -->
@@ -467,6 +468,7 @@
       orderBy 
     } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 
+    // ⚠️ ここをご自身のFirebaseプロジェクトの設定値に差し替えてください
     const firebaseConfig = {
   apiKey: "AIzaSyCGxnALF5RNC1RvhE-IOEWDrHNnf4a56r4",
   authDomain: "karaoke-app-7feaf.firebaseapp.com",
@@ -486,8 +488,10 @@
     }
 
     try {
-      if (firebaseConfig.apiKey === "YOUR_API_KEY") {
-        showStatus("⚠️ Firebaseの設定が未入力です。firebaseConfigを入力してください。", true);
+      if (firebaseConfig.apiKey === "YOUR_API_KEY" || !firebaseConfig.projectId) {
+        showStatus("⚠️ Firebaseの設定が未入力です。firebaseConfigにご自身のプロジェクト情報を入力してください。", true);
+        const countEl = document.getElementById('songCount');
+        if (countEl) countEl.textContent = "Firebase設定待ち";
       } else {
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
@@ -497,14 +501,19 @@
         const q = query(collection(db, "songs"), orderBy("createdAt", "desc"));
         onSnapshot(q, (snapshot) => {
           window.songs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          document.getElementById('statusBanner').classList.add('hidden');
-          window.render();
-          window.renderSetlist();
+          const banner = document.getElementById('statusBanner');
+          if (banner) banner.classList.add('hidden');
+          if (typeof window.render === 'function') window.render();
+          if (typeof window.renderSetlist === 'function') window.renderSetlist();
         }, (err) => {
-          showStatus("⚠️ 通信エラー: " + err.message, true);
+          console.error("Firestore Error:", err);
+          showStatus("⚠️ Firestore通信エラー: " + err.message + "（セキュリティルールや接続設定を確認してください）", true);
+          const countEl = document.getElementById('songCount');
+          if (countEl) countEl.textContent = "通信エラー";
         });
       }
     } catch (e) {
+      console.error("Init Error:", e);
       showStatus("⚠️ 初期化エラー: " + e.message, true);
     }
   </script>
@@ -652,7 +661,7 @@
               duration: item.trackTimeMillis ? `${mins}:${secs}` : '',
               durationMs: item.trackTimeMillis || 0,
               key: '0',
-              score: '歌える', // 完成度初期値
+              score: '歌える',
               duetType: isDuet ? 'duet' : 'solo',
               tags: tags,
               isAlreadyAdded: isAlreadyAdded,
@@ -894,7 +903,7 @@
           scoreVal: null,
           duetType: s.duetType || 'solo',
           key: s.key || '0',
-          score: s.score || '歌える', // 指定した完成度を保存
+          score: s.score || '歌える',
           tags: s.tags || [],
           memo: '',
           singCount: 0,
@@ -1667,7 +1676,7 @@
     }
 
     function getCurrentFilteredSongs() {
-      const queryStr = document.getElementById('searchInput').value.toLowerCase();
+      const queryStr = (document.getElementById('searchInput')?.value || '').toLowerCase();
       return (window.songs || []).filter(s => {
         const matchesQuery = (s.title || '').toLowerCase().includes(queryStr) || 
                              (s.artist || '').toLowerCase().includes(queryStr) ||
@@ -1710,7 +1719,8 @@
     }
 
     window.render = function() {
-      const sortMode = document.getElementById('sortSelect').value;
+      const sortSelect = document.getElementById('sortSelect');
+      const sortMode = sortSelect ? sortSelect.value : 'lastSung';
       let filtered = getCurrentFilteredSongs();
 
       filtered.sort((a, b) => {
@@ -1725,12 +1735,14 @@
       // ジャンル一覧
       const allGenres = Array.from(new Set((window.songs || []).map(s => s.genre).filter(Boolean)));
       const genreContainer = document.getElementById('genreFilterList');
-      genreContainer.innerHTML = '';
-      if (allGenres.length > 0) {
-        genreContainer.innerHTML += `<button onclick="setFilterGenre(null)" class="px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 transition ${selectedGenre === null ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">全ジャンル</button>`;
-        allGenres.forEach(g => {
-          genreContainer.innerHTML += `<button onclick="setFilterGenre('${g}')" class="px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 transition ${selectedGenre === g ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">${escapeHtml(g)}</button>`;
-        });
+      if (genreContainer) {
+        genreContainer.innerHTML = '';
+        if (allGenres.length > 0) {
+          genreContainer.innerHTML += `<button onclick="setFilterGenre(null)" class="px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 transition ${selectedGenre === null ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">全ジャンル</button>`;
+          allGenres.forEach(g => {
+            genreContainer.innerHTML += `<button onclick="setFilterGenre('${g}')" class="px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 transition ${selectedGenre === g ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">${escapeHtml(g)}</button>`;
+          });
+        }
       }
 
       // タグ一覧（複数選択バッジ描画）
@@ -1738,31 +1750,40 @@
       const tagContainer = document.getElementById('tagFilterList');
       const tagBadge = document.getElementById('selectedTagBadge');
       
-      if (selectedTags.size > 0) {
-        tagBadge.textContent = selectedTags.size;
-        tagBadge.classList.remove('hidden');
-      } else {
-        tagBadge.classList.add('hidden');
+      if (tagBadge) {
+        if (selectedTags.size > 0) {
+          tagBadge.textContent = selectedTags.size;
+          tagBadge.classList.remove('hidden');
+        } else {
+          tagBadge.classList.add('hidden');
+        }
       }
 
-      tagContainer.innerHTML = '';
-      if (allTags.length > 0) {
-        allTags.forEach(tag => {
-          const isSelected = selectedTags.has(tag);
-          tagContainer.innerHTML += `
-            <button onclick="toggleTagFilter('${escapeHtml(tag)}')" class="px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 transition text-[11px] flex items-center gap-1 ${
-              isSelected ? 'bg-indigo-600 text-white font-bold shadow-sm' : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-white'
-            }">
-              <span>#${escapeHtml(tag)}</span>
-              ${isSelected ? '<span class="text-[9px]">✓</span>' : ''}
-            </button>
-          `;
-        });
+      if (tagContainer) {
+        tagContainer.innerHTML = '';
+        if (allTags.length > 0) {
+          allTags.forEach(tag => {
+            const isSelected = selectedTags.has(tag);
+            tagContainer.innerHTML += `
+              <button onclick="toggleTagFilter('${escapeHtml(tag)}')" class="px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 transition text-[11px] flex items-center gap-1 ${
+                isSelected ? 'bg-indigo-600 text-white font-bold shadow-sm' : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-white'
+              }">
+                <span>#${escapeHtml(tag)}</span>
+                ${isSelected ? '<span class="text-[9px]">✓</span>' : ''}
+              </button>
+            `;
+          });
+        }
       }
 
-      document.getElementById('songCount').textContent = `登録曲: ${filtered.length}曲 / 全${(window.songs || []).length}曲`;
+      const songCountEl = document.getElementById('songCount');
+      if (songCountEl) {
+        songCountEl.textContent = `登録曲: ${filtered.length}曲 / 全${(window.songs || []).length}曲`;
+      }
 
       const listContainer = document.getElementById('songList');
+      if (!listContainer) return;
+
       if (filtered.length === 0) {
         listContainer.innerHTML = '<div class="text-center text-slate-500 py-12 text-sm">該当する曲がありません</div>';
         return;
@@ -2157,6 +2178,7 @@
       document.getElementById('randomBanner').classList.add('hidden');
     };
 
+    // 初期マウント
     render();
   </script>
 </body>
