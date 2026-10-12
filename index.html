@@ -21,14 +21,14 @@
         <h1 class="font-bold text-sm tracking-wide text-white">マイカラオケリスト</h1>
       </div>
       <div class="flex items-center gap-1.5">
-        <button onclick="toggleSetlistDrawer()" class="relative bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 whitespace-nowrap shadow-sm">
+        <button onclick="window.toggleSetlistDrawer()" class="relative bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 whitespace-nowrap shadow-sm">
           <span>📋 セットリスト</span>
           <span id="setlistBadge" class="hidden bg-indigo-500 text-white rounded-full px-1.5 py-0.2 text-[10px] font-mono">0</span>
         </button>
-        <button onclick="openModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1.5 rounded-xl text-xs font-bold shadow flex items-center gap-0.5 transition whitespace-nowrap">
+        <button onclick="window.openModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1.5 rounded-xl text-xs font-bold shadow flex items-center gap-0.5 transition whitespace-nowrap">
           ＋ 追加
         </button>
-        <button onclick="openSettingsModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 p-1.5 rounded-xl text-xs transition shrink-0" title="管理設定">
+        <button onclick="window.openSettingsModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 p-1.5 rounded-xl text-xs transition shrink-0" title="管理設定">
           ⚙️
         </button>
       </div>
@@ -36,13 +36,13 @@
 
     <!-- 3分割メインナビゲーション -->
     <div class="max-w-md mx-auto grid grid-cols-3 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
-      <button id="navTabMyList" onclick="switchMainTab('mylist')" class="py-1.5 rounded-lg font-bold transition bg-indigo-600 text-white shadow text-center truncate">
+      <button id="navTabMyList" onclick="window.switchMainTab('mylist')" class="py-1.5 rounded-lg font-bold transition bg-indigo-600 text-white shadow text-center truncate">
         マイリスト
       </button>
-      <button id="navTabRecommend" onclick="switchMainTab('recommend')" class="py-1.5 rounded-lg font-bold transition text-slate-400 hover:text-white text-center truncate">
+      <button id="navTabRecommend" onclick="window.switchMainTab('recommend')" class="py-1.5 rounded-lg font-bold transition text-slate-400 hover:text-white text-center truncate">
         ✨ 名曲発掘
       </button>
-      <button id="navTabRanking" onclick="switchMainTab('ranking')" class="py-1.5 rounded-lg font-bold transition text-slate-400 hover:text-white text-center truncate">
+      <button id="navTabRanking" onclick="window.switchMainTab('ranking')" class="py-1.5 rounded-lg font-bold transition text-slate-400 hover:text-white text-center truncate">
         🔥 流行チャート
       </button>
     </div>
@@ -54,27 +54,27 @@
 
     <!-- 検索バー -->
     <div class="flex gap-2">
-      <input type="text" id="searchInput" oninput="render()" placeholder="曲名・歌手・ジャンル・タグ・音域・メモで検索..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm placeholder:text-slate-600 text-slate-100 focus:outline-none focus:border-indigo-500">
-      <button onclick="pickRandom()" class="bg-slate-900 border border-slate-800 px-3.5 py-2.5 rounded-xl text-lg hover:bg-slate-800 transition shrink-0" title="ランダム選曲">🎲</button>
+      <input type="text" id="searchInput" oninput="window.render()" placeholder="曲名・歌手・ジャンル・タグ・音域・メモで検索..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm placeholder:text-slate-600 text-slate-100 focus:outline-none focus:border-indigo-500">
+      <button onclick="window.pickRandom()" class="bg-slate-900 border border-slate-800 px-3.5 py-2.5 rounded-xl text-lg hover:bg-slate-800 transition shrink-0" title="ランダム選曲">🎲</button>
     </div>
 
     <!-- 年代別 & キー属性別フィルター -->
     <div class="space-y-1.5">
       <div class="flex gap-1 overflow-x-auto no-scrollbar text-xs" id="decadeTabs">
-        <button onclick="setDecadeFilter('all')" class="decade-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0" data-val="all">全年代</button>
-        <button onclick="setDecadeFilter('2020s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="2020s">2020年代</button>
-        <button onclick="setDecadeFilter('2010s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="2010s">2010年代</button>
-        <button onclick="setDecadeFilter('2000s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="2000s">2000年代</button>
-        <button onclick="setDecadeFilter('90s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="90s">90年代以前</button>
+        <button onclick="window.setDecadeFilter('all')" class="decade-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0" data-val="all">全年代</button>
+        <button onclick="window.setDecadeFilter('2020s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="2020s">2020年代</button>
+        <button onclick="window.setDecadeFilter('2010s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="2010s">2010年代</button>
+        <button onclick="window.setDecadeFilter('2000s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="2000s">2000年代</button>
+        <button onclick="window.setDecadeFilter('90s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="90s">90年代以前</button>
       </div>
 
       <!-- キー属性 & デュエットフィルター -->
       <div class="flex gap-1 overflow-x-auto no-scrollbar text-[11px]" id="attrTabs">
-        <button onclick="setAttrFilter('all')" class="attr-tab px-2 py-0.5 rounded-md bg-slate-800 text-white font-medium whitespace-nowrap shrink-0" data-val="all">キー全般</button>
-        <button onclick="setAttrFilter('original')" class="attr-tab px-2 py-0.5 rounded-md bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="original">原曲キー</button>
-        <button onclick="setAttrFilter('plus')" class="attr-tab px-2 py-0.5 rounded-md bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="plus">＋キー</button>
-        <button onclick="setAttrFilter('minus')" class="attr-tab px-2 py-0.5 rounded-md bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="minus">−キー</button>
-        <button onclick="setAttrFilter('duet')" class="attr-tab px-2 py-0.5 rounded-md bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="duet">👥 デュエット</button>
+        <button onclick="window.setAttrFilter('all')" class="attr-tab px-2 py-0.5 rounded-md bg-slate-800 text-white font-medium whitespace-nowrap shrink-0" data-val="all">キー全般</button>
+        <button onclick="window.setAttrFilter('original')" class="attr-tab px-2 py-0.5 rounded-md bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="original">原曲キー</button>
+        <button onclick="window.setAttrFilter('plus')" class="attr-tab px-2 py-0.5 rounded-md bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="plus">＋キー</button>
+        <button onclick="window.setAttrFilter('minus')" class="attr-tab px-2 py-0.5 rounded-md bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="minus">−キー</button>
+        <button onclick="window.setAttrFilter('duet')" class="attr-tab px-2 py-0.5 rounded-md bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="duet">👥 デュエット</button>
       </div>
     </div>
 
@@ -93,10 +93,10 @@
         </div>
         <div class="flex items-center gap-2 text-[10px]">
           <div class="flex bg-slate-950 rounded border border-slate-800 p-0.5">
-            <button id="tagModeAnd" onclick="setTagFilterMode('AND')" class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-600 text-white">AND</button>
-            <button id="tagModeOr" onclick="setTagFilterMode('OR')" class="px-1.5 py-0.5 rounded text-[9px] text-slate-400 hover:text-white">OR</button>
+            <button id="tagModeAnd" onclick="window.setTagFilterMode('AND')" class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-600 text-white">AND</button>
+            <button id="tagModeOr" onclick="window.setTagFilterMode('OR')" class="px-1.5 py-0.5 rounded text-[9px] text-slate-400 hover:text-white">OR</button>
           </div>
-          <button onclick="clearSelectedTags()" class="text-slate-500 hover:text-slate-300">クリア</button>
+          <button onclick="window.clearSelectedTags()" class="text-slate-500 hover:text-slate-300">クリア</button>
         </div>
       </div>
       <div id="tagFilterList" class="flex gap-1.5 overflow-x-auto no-scrollbar text-xs pt-1"></div>
@@ -105,19 +105,19 @@
     <!-- ソート & 完成度フィルター & 表示切替ボタン -->
     <div class="flex items-center justify-between gap-1.5 text-xs pt-1">
       <div class="flex gap-1 overflow-x-auto no-scrollbar py-0.5" id="scoreTabs">
-        <button onclick="setScoreFilter('all')" class="score-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0" data-val="all">すべて</button>
-        <button onclick="setScoreFilter('得意')" class="score-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="得意">得意</button>
-        <button onclick="setScoreFilter('歌える')" class="score-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="歌える">歌える</button>
-        <button onclick="setScoreFilter('練習中')" class="score-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="練習中">練習中</button>
+        <button onclick="window.setScoreFilter('all')" class="score-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0" data-val="all">すべて</button>
+        <button onclick="window.setScoreFilter('得意')" class="score-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="得意">得意</button>
+        <button onclick="window.setScoreFilter('歌える')" class="score-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="歌える">歌える</button>
+        <button onclick="window.setScoreFilter('練習中')" class="score-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="練習中">練習中</button>
       </div>
 
       <div class="flex items-center gap-1.5 shrink-0">
-        <button id="btnToggleAllExpand" onclick="toggleAllExpand()" class="bg-slate-900 hover:bg-slate-800 border border-slate-800 px-2 py-1 rounded-lg text-slate-300 text-[11px] whitespace-nowrap transition flex items-center gap-1" title="全曲の詳細表示/コンパクト表示を切り替え">
+        <button id="btnToggleAllExpand" onclick="window.toggleAllExpand()" class="bg-slate-900 hover:bg-slate-800 border border-slate-800 px-2 py-1 rounded-lg text-slate-300 text-[11px] whitespace-nowrap transition flex items-center gap-1" title="全曲の詳細表示/コンパクト表示を切り替え">
           <span id="toggleAllExpandIcon">📖</span>
           <span id="toggleAllExpandText">全展開</span>
         </button>
 
-        <select id="sortSelect" onchange="render()" class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-slate-300 focus:outline-none shrink-0 text-[11px]">
+        <select id="sortSelect" onchange="window.render()" class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-slate-300 focus:outline-none shrink-0 text-[11px]">
           <option value="lastSung">最近歌った順</option>
           <option value="singCount">歌唱回数が多い順 🔥</option>
           <option value="scoreVal">自己ベスト高得点順 🎯</option>
@@ -135,7 +135,7 @@
       <div id="randomArtist" class="text-sm text-slate-300"></div>
       <div id="randomMeta" class="text-xs text-indigo-300 mt-1"></div>
       <div id="randomKey" class="mt-2 text-xs font-semibold text-indigo-200"></div>
-      <button onclick="closeRandom()" class="absolute top-2.5 right-2.5 text-slate-400 hover:text-white text-xs p-1">✕</button>
+      <button onclick="window.closeRandom()" class="absolute top-2.5 right-2.5 text-slate-400 hover:text-white text-xs p-1">✕</button>
     </div>
 
     <div class="text-[11px] text-slate-400 px-1 flex justify-between">
@@ -152,7 +152,7 @@
         <h2 class="font-bold text-base text-white">✨ 名曲発掘 & 数珠つなぎ</h2>
         <p class="text-[11px] text-slate-400">同系統アーティストや、あの頃のアニメ・ドラマ曲を発掘</p>
       </div>
-      <button onclick="analyzeAndRecommend()" class="text-xs text-indigo-400 bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg hover:bg-slate-800 shrink-0 whitespace-nowrap">
+      <button onclick="window.analyzeAndRecommend()" class="text-xs text-indigo-400 bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg hover:bg-slate-800 shrink-0 whitespace-nowrap">
         🔄 再発掘
       </button>
     </div>
@@ -173,7 +173,7 @@
         <h2 class="font-bold text-base text-white">🔥 Apple Music 日本トップソング</h2>
         <p class="text-[11px] text-slate-400">ジャケットタップで30秒試聴できます</p>
       </div>
-      <button onclick="loadRanking()" class="text-xs text-indigo-400 bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg hover:bg-slate-800 shrink-0 whitespace-nowrap">
+      <button onclick="window.loadRanking()" class="text-xs text-indigo-400 bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg hover:bg-slate-800 shrink-0 whitespace-nowrap">
         🔄 更新
       </button>
     </div>
@@ -194,8 +194,8 @@
         <div id="setlistSummary" class="text-[11px] text-indigo-400 font-mono mt-0.5">0曲 • 合計 0分00秒</div>
       </div>
       <div class="flex items-center gap-2">
-        <button onclick="clearSetlist()" class="text-[11px] text-slate-400 hover:text-rose-400 whitespace-nowrap">全クリア</button>
-        <button onclick="toggleSetlistDrawer()" class="text-slate-400 text-sm p-1">✕</button>
+        <button onclick="window.clearSetlist()" class="text-[11px] text-slate-400 hover:text-rose-400 whitespace-nowrap">全クリア</button>
+        <button onclick="window.toggleSetlistDrawer()" class="text-slate-400 text-sm p-1">✕</button>
       </div>
     </div>
     <div id="setlistItems" class="max-h-60 overflow-y-auto no-scrollbar space-y-2"></div>
@@ -206,7 +206,7 @@
     <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-5 shadow-2xl my-auto space-y-4">
       <div class="flex justify-between items-center border-b border-slate-800 pb-2.5">
         <h2 class="text-base font-bold flex items-center gap-1.5 text-white">⚙️ 管理・メンテナンス設定</h2>
-        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-white text-sm p-1">✕</button>
+        <button onclick="window.closeSettingsModal()" class="text-slate-400 hover:text-white text-sm p-1">✕</button>
       </div>
 
       <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-2">
@@ -215,7 +215,7 @@
           過去に登録した曲で、画像・演奏時間・年代・プレビューURLなどが空のものを検出し、iTunesから一括取得して更新します。
         </p>
         <div id="migrateProgressText" class="text-[10px] text-indigo-300 hidden"></div>
-        <button id="btnMigrate" onclick="startDataMigration()" class="w-full bg-indigo-600/90 hover:bg-indigo-600 text-white py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1">
+        <button id="btnMigrate" onclick="window.startDataMigration()" class="w-full bg-indigo-600/90 hover:bg-indigo-600 text-white py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1">
           <span>🚀 未補完データを一括アップデート</span>
         </button>
       </div>
@@ -226,12 +226,12 @@
           Firestoreの全登録データをJSONファイルとしてダウンロード保存、または復元します。
         </p>
         <div class="grid grid-cols-2 gap-2 pt-1">
-          <button onclick="exportBackupJSON()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 py-2 rounded-lg text-xs font-medium border border-slate-700 flex items-center justify-center gap-1">
+          <button onclick="window.exportBackupJSON()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 py-2 rounded-lg text-xs font-medium border border-slate-700 flex items-center justify-center gap-1">
             📥 保存 (JSON)
           </button>
           <label class="bg-slate-800 hover:bg-slate-700 text-slate-200 py-2 rounded-lg text-xs font-medium border border-slate-700 flex items-center justify-center gap-1 cursor-pointer">
             📤 復元
-            <input type="file" id="importFileInput" accept=".json" onchange="importBackupJSON(event)" class="hidden">
+            <input type="file" id="importFileInput" accept=".json" onchange="window.importBackupJSON(event)" class="hidden">
           </label>
         </div>
       </div>
@@ -241,12 +241,12 @@
         <p class="text-[11px] text-slate-400 leading-relaxed">
           曲データは残したまま、全曲の「歌唱回数」と「最近歌った日時」のみをゼロに初期化します。
         </p>
-        <button onclick="resetAllSingHistory()" class="w-full bg-rose-950/60 hover:bg-rose-900 border border-rose-800/80 text-rose-300 py-2 rounded-lg text-xs font-bold transition">
+        <button onclick="window.resetAllSingHistory()" class="w-full bg-rose-950/60 hover:bg-rose-900 border border-rose-800/80 text-rose-300 py-2 rounded-lg text-xs font-bold transition">
           ⚠️ 歌唱カウンターを全クリア
         </button>
       </div>
 
-      <button type="button" onclick="closeSettingsModal()" class="w-full bg-slate-800 text-slate-300 py-2 rounded-lg text-xs font-bold">
+      <button type="button" onclick="window.closeSettingsModal()" class="w-full bg-slate-800 text-slate-300 py-2 rounded-lg text-xs font-bold">
         閉じる
       </button>
     </div>
@@ -259,10 +259,10 @@
       <div class="flex items-center justify-between border-b border-slate-800 pb-2">
         <h2 id="modalTitle" class="text-sm font-bold flex items-center gap-1 text-white">🎵 曲を登録</h2>
         <div id="modalTabContainer" class="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-xs">
-          <button id="modalTabSingle" type="button" onclick="switchModalTab('single')" class="px-2 py-1 rounded-md font-bold bg-indigo-600 text-white">
+          <button id="modalTabSingle" type="button" onclick="window.switchModalTab('single')" class="px-2 py-1 rounded-md font-bold bg-indigo-600 text-white">
             単曲
           </button>
-          <button id="modalTabBulk" type="button" onclick="switchModalTab('bulk')" class="px-2 py-1 rounded-md font-bold text-slate-400 hover:text-white">
+          <button id="modalTabBulk" type="button" onclick="window.switchModalTab('bulk')" class="px-2 py-1 rounded-md font-bold text-slate-400 hover:text-white">
             📋 まとめて一括
           </button>
         </div>
@@ -274,14 +274,14 @@
           <div class="text-[11px] font-bold text-indigo-400">⚡ iTunesで検索（歌手・曲名から最大50曲）</div>
           <div class="flex gap-1.5">
             <input type="text" id="apiSearchInput" placeholder="歌手名や曲名を入力..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-slate-600 focus:outline-none">
-            <button type="button" onclick="searchITunes()" class="bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap">検索</button>
+            <button type="button" onclick="window.searchITunes()" class="bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap">検索</button>
           </div>
           
           <div id="apiSortRow" class="hidden flex items-center justify-between text-[11px] text-slate-400 pt-1">
             <span id="apiResultCount">0件</span>
             <div class="flex items-center gap-1">
               <span>並び順:</span>
-              <select id="apiSortSelect" onchange="renderITunesResults()" class="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-slate-200 text-[10px] focus:outline-none">
+              <select id="apiSortSelect" onchange="window.renderITunesResults()" class="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-slate-200 text-[10px] focus:outline-none">
                 <option value="default">人気・関連度順</option>
                 <option value="title">曲名順 (あいうえお)</option>
                 <option value="yearDesc">リリース年が新しい順</option>
@@ -293,7 +293,7 @@
           <div id="apiSearchResults" class="max-h-52 overflow-y-auto no-scrollbar space-y-1.5 hidden"></div>
         </div>
 
-        <form onsubmit="handleSave(event)" class="space-y-3 text-sm">
+        <form onsubmit="window.handleSave(event)" class="space-y-3 text-sm">
           <input type="hidden" id="editSongId" value="">
           <input type="hidden" id="formArtwork" value="">
           <input type="hidden" id="formPreviewUrl" value="">
@@ -327,11 +327,11 @@
           <div class="grid grid-cols-2 gap-2 bg-slate-950/60 p-2 rounded-xl border border-slate-800/80">
             <div>
               <label class="block text-[11px] text-amber-400 mb-1">🔥 最高音</label>
-              <input type="text" id="formMaxPitch" placeholder="例: hiA, mid2G" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-500">
+              <input type="text" id="formMaxPitch" placeholder="例: hiA, mid2G" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-500">
             </div>
             <div>
               <label class="block text-[11px] text-sky-400 mb-1">💧 最低音</label>
-              <input type="text" id="formMinPitch" placeholder="例: mid1D, lowG" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-sky-500">
+              <input type="text" id="formMinPitch" placeholder="例: mid1D, lowG" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-sky-500">
             </div>
           </div>
 
@@ -388,11 +388,11 @@
           </div>
 
           <div id="resetSungRow" class="hidden pt-1">
-            <button type="button" onclick="clearSungHistory()" class="text-xs text-slate-400 hover:text-rose-400 underline">歌唱履歴・回数をクリアする</button>
+            <button type="button" onclick="window.clearSungHistory()" class="text-xs text-slate-400 hover:text-rose-400 underline">歌唱履歴・回数をクリアする</button>
           </div>
 
           <div class="flex gap-2 pt-1">
-            <button type="button" onclick="closeModal()" class="flex-1 bg-slate-800 text-slate-300 py-2.5 rounded-lg font-bold">キャンセル</button>
+            <button type="button" onclick="window.closeModal()" class="flex-1 bg-slate-800 text-slate-300 py-2.5 rounded-lg font-bold">キャンセル</button>
             <button type="submit" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-lg font-bold transition">保存</button>
           </div>
         </form>
@@ -408,7 +408,7 @@
         <textarea id="bulkTextInput" rows="5" placeholder="白日 King Gnu&#10;Lemon 米津玄師&#10;怪獣の花唄&#10;天体観測&#10;丸の内サディスティック" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 leading-relaxed"></textarea>
 
         <div class="flex gap-2">
-          <button type="button" id="btnBulkSearch" onclick="processBulkSearch()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1">
+          <button type="button" id="btnBulkSearch" onclick="window.processBulkSearch()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1">
             <span>⚡ 一括検索して確認</span>
           </button>
           <button type="button" onclick="document.getElementById('bulkTextInput').value=''" class="px-3 bg-slate-800 text-slate-400 hover:text-white py-2 rounded-lg text-xs font-semibold">
@@ -427,8 +427,8 @@
           <div id="bulkPreviewList" class="max-h-60 overflow-y-auto no-scrollbar space-y-2"></div>
 
           <div class="flex gap-2 pt-2 border-t border-slate-800">
-            <button type="button" onclick="closeModal()" class="flex-1 bg-slate-800 text-slate-300 py-2.5 rounded-lg text-xs font-bold">キャンセル</button>
-            <button type="button" id="btnBulkSave" onclick="saveBulkSongs()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-lg text-xs font-bold transition">
+            <button type="button" onclick="window.closeModal()" class="flex-1 bg-slate-800 text-slate-300 py-2.5 rounded-lg text-xs font-bold">キャンセル</button>
+            <button type="button" id="btnBulkSave" onclick="window.saveBulkSongs()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-lg text-xs font-bold transition">
               一括保存する
             </button>
           </div>
@@ -438,9 +438,8 @@
     </div>
   </div>
 
-  <!-- 分割したJSファイルの読み込み -->
+  <!-- 分割したJSファイルの読み込み: 必ず先にapp.jsを通常読み込みし、その後にdb.jsを実行 -->
+  <script src="./app.js"></script>
   <script type="module" src="./db.js"></script>
-  <script type="module" src="./app.js"></script>
-
 </body>
 </html>
