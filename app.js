@@ -50,7 +50,7 @@ function saveSetlist() {
 
 function checkIsDuet(title, artist) {
   const target = `${title || ''} ${artist || ''}`.toLowerCase();
-  const duetPatterns = ['feat.', 'feat ', 'featuring', 'with ', 'with\u3000', 'duet', 'デュエット', '合唱', ' & ', '＆', ' × ', '×', ' / '];
+  const duetPatterns = ['feat.', 'feat ', 'featuring', 'with ', 'with　', 'duet', 'デュエット', '合唱', ' & ', '＆', ' × ', '×', ' / '];
   return duetPatterns.some(pattern => target.includes(pattern));
 }
 
