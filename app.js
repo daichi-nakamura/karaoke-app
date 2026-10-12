@@ -45,7 +45,7 @@ const TIE_UP_PRESETS = [
 
 function saveSetlist() {
   localStorage.setItem('karaoke_setlist', JSON.stringify(setlist));
-  renderSetlist();
+  if (typeof window.renderSetlist === 'function') window.renderSetlist();
 }
 
 function checkIsDuet(title, artist) {
@@ -64,6 +64,8 @@ window.switchModalTab = function(mode) {
   const tabBulk = document.getElementById('modalTabBulk');
   const panelSingle = document.getElementById('modalPanelSingle');
   const panelBulk = document.getElementById('modalPanelBulk');
+
+  if (!tabSingle || !tabBulk || !panelSingle || !panelBulk) return;
 
   if (mode === 'single') {
     tabSingle.className = "px-2 py-1 rounded-md font-bold bg-indigo-600 text-white";
@@ -177,6 +179,7 @@ function renderBulkPreview() {
   const container = document.getElementById('bulkPreviewList');
   const countEl = document.getElementById('bulkFoundCount');
   const btnSave = document.getElementById('btnBulkSave');
+  if (!container || !countEl || !btnSave) return;
 
   const validCount = bulkCandidateSongs.filter(s => !s.isAlreadyAdded).length;
   countEl.textContent = `候補: ${bulkCandidateSongs.length}件 (保存対象: ${validCount}件)`;
@@ -191,10 +194,10 @@ function renderBulkPreview() {
           <span class="text-slate-300 font-mono bg-slate-900 px-1.5 py-0.2 rounded border border-slate-800">「${escapeHtml(s.originalQuery)}」</span>
         </span>
         <div class="flex items-center gap-1 shrink-0">
-          <button type="button" onclick="toggleEditBulkCandidate(${idx})" class="text-indigo-400 hover:text-indigo-300 px-1 text-xs font-semibold">
+          <button type="button" onclick="window.toggleEditBulkCandidate(${idx})" class="text-indigo-400 hover:text-indigo-300 px-1 text-xs font-semibold">
             ${s.isEditing ? '完了' : '✏️ 修正'}
           </button>
-          <button type="button" onclick="removeBulkCandidate(${idx})" class="text-slate-500 hover:text-rose-400 px-1 text-xs">✕ 除外</button>
+          <button type="button" onclick="window.removeBulkCandidate(${idx})" class="text-slate-500 hover:text-rose-400 px-1 text-xs">✕ 除外</button>
         </div>
       </div>
 
@@ -220,23 +223,23 @@ function renderBulkPreview() {
           <div class="grid grid-cols-2 gap-1.5">
             <div>
               <label class="block text-[9px] text-slate-400 mb-0.5">曲名</label>
-              <input type="text" value="${escapeHtml(s.title)}" onchange="updateBulkCandidateField(${idx}, 'title', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-white">
+              <input type="text" value="${escapeHtml(s.title)}" onchange="window.updateBulkCandidateField(${idx}, 'title', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-white">
             </div>
             <div>
               <label class="block text-[9px] text-slate-400 mb-0.5">歌手名</label>
-              <input type="text" value="${escapeHtml(s.artist)}" onchange="updateBulkCandidateField(${idx}, 'artist', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-white">
+              <input type="text" value="${escapeHtml(s.artist)}" onchange="window.updateBulkCandidateField(${idx}, 'artist', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-white">
             </div>
           </div>
           <div class="grid grid-cols-4 gap-1.5">
             <div>
               <label class="block text-[9px] text-slate-400 mb-0.5">キー</label>
-              <select onchange="updateBulkCandidateField(${idx}, 'key', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1 py-1 text-[11px] text-white">
+              <select onchange="window.updateBulkCandidateField(${idx}, 'key', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1 py-1 text-[11px] text-white">
                 ${['-6','-5','-4','-3','-2','-1','0','+1','+2','+3','+4','+5','+6'].map(k => `<option value="${k}" ${s.key === k ? 'selected' : ''}>${k === '0' ? '原曲' : k}</option>`).join('')}
               </select>
             </div>
             <div>
               <label class="block text-[9px] text-emerald-400 mb-0.5">完成度</label>
-              <select onchange="updateBulkCandidateField(${idx}, 'score', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1 py-1 text-[11px] text-white">
+              <select onchange="window.updateBulkCandidateField(${idx}, 'score', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1 py-1 text-[11px] text-white">
                 <option value="得意" ${s.score === '得意' ? 'selected' : ''}>得意</option>
                 <option value="歌える" ${s.score === '歌える' ? 'selected' : ''}>歌える</option>
                 <option value="練習中" ${s.score === '練習中' ? 'selected' : ''}>練習中</option>
@@ -244,21 +247,21 @@ function renderBulkPreview() {
             </div>
             <div>
               <label class="block text-[9px] text-slate-400 mb-0.5">タイプ</label>
-              <select onchange="updateBulkCandidateField(${idx}, 'duetType', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1 py-1 text-[11px] text-white">
+              <select onchange="window.updateBulkCandidateField(${idx}, 'duetType', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1 py-1 text-[11px] text-white">
                 <option value="solo" ${s.duetType === 'solo' ? 'selected' : ''}>ソロ</option>
                 <option value="duet" ${s.duetType === 'duet' ? 'selected' : ''}>デュエット</option>
               </select>
             </div>
             <div>
               <label class="block text-[9px] text-slate-400 mb-0.5">年</label>
-              <input type="text" value="${escapeHtml(s.year || '')}" onchange="updateBulkCandidateField(${idx}, 'year', this.value)" placeholder="2020" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-white">
+              <input type="text" value="${escapeHtml(s.year || '')}" onchange="window.updateBulkCandidateField(${idx}, 'year', this.value)" placeholder="2020" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-white">
             </div>
           </div>
           <div class="pt-1 border-t border-slate-800">
             <div class="text-[9px] text-indigo-400 font-semibold mb-1">🔍 iTunesから再検索して差し替え</div>
             <div class="flex gap-1">
               <input type="text" id="reSearchInput_${idx}" placeholder="再検索キーワード..." value="${escapeHtml(s.title + ' ' + (s.artist || ''))}" class="flex-1 bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[10px] text-white">
-              <button type="button" onclick="reSearchSingleBulkCandidate(${idx})" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded text-[10px] whitespace-nowrap">再取得</button>
+              <button type="button" onclick="window.reSearchSingleBulkCandidate(${idx})" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded text-[10px] whitespace-nowrap">再取得</button>
             </div>
           </div>
         </div>
@@ -357,7 +360,7 @@ window.saveBulkSongs = async function() {
     count++;
   }
   alert(`🎉 ${count}曲を一括登録しました！`);
-  closeModal();
+  window.closeModal();
 };
 
 // 管理設定
@@ -452,7 +455,7 @@ window.importBackupJSON = function(e) {
         count++;
       }
       alert(`🎉 ${count} 曲の復元が完了しました！`);
-      closeSettingsModal();
+      window.closeSettingsModal();
     } catch (err) {
       alert("読み込み失敗: " + err.message);
     }
@@ -472,7 +475,7 @@ window.resetAllSingHistory = async function() {
     }
   }
   alert("全曲の歌唱カウンターをゼロにリセットしました。");
-  closeSettingsModal();
+  window.closeSettingsModal();
 };
 
 // メインタブ
@@ -483,6 +486,7 @@ window.switchMainTab = function(tab) {
     { id: 'ranking', btn: document.getElementById('navTabRanking'), view: document.getElementById('viewRanking') }
   ];
   tabs.forEach(t => {
+    if (!t.btn || !t.view) return;
     if (t.id === tab) {
       t.btn.className = "py-1.5 rounded-lg font-bold transition bg-indigo-600 text-white shadow text-center truncate";
       t.view.classList.remove('hidden');
@@ -492,8 +496,8 @@ window.switchMainTab = function(tab) {
     }
   });
 
-  if (tab === 'ranking' && rankingSongs.length === 0) loadRanking();
-  else if (tab === 'recommend' && recommendedSongs.length === 0) analyzeAndRecommend();
+  if (tab === 'ranking' && rankingSongs.length === 0) window.loadRanking();
+  else if (tab === 'recommend' && recommendedSongs.length === 0) window.analyzeAndRecommend();
 };
 
 // プレビュー再生
@@ -532,7 +536,7 @@ window.togglePlayPreview = async function(url, id, trackName = '', artistName = 
 };
 
 function renderAllViews() {
-  render();
+  window.render();
   renderRanking();
   renderRecommended();
 }
@@ -540,6 +544,7 @@ function renderAllViews() {
 // ランキング
 window.loadRanking = async function() {
   const container = document.getElementById('rankingList');
+  if (!container) return;
   container.innerHTML = '<div class="text-center text-slate-500 py-12 text-sm">ランキングを取得中...</div>';
   try {
     const res = await fetch('https://itunes.apple.com/jp/rss/topsongs/limit=50/json');
@@ -570,6 +575,7 @@ window.loadRanking = async function() {
 
 function renderRanking() {
   const container = document.getElementById('rankingList');
+  if (!container) return;
   if (rankingSongs.length === 0) return container.innerHTML = '<div class="text-center text-slate-500 py-12 text-sm">曲がありません</div>';
 
   container.innerHTML = rankingSongs.map(item => {
@@ -580,7 +586,7 @@ function renderRanking() {
     return `
       <div class="bg-slate-900/90 border border-slate-800 p-3 rounded-2xl flex items-center gap-3">
         <span class="font-mono font-bold text-sm text-indigo-400 w-5 text-center shrink-0">${item.rank}</span>
-        <div onclick="togglePlayPreview('${item.previewUrl || ''}', '${playId}', '${escapeHtml(item.title)}', '${escapeHtml(item.artist)}', '${item.trackId || ''}')" class="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 cursor-pointer shadow border border-slate-800 bg-slate-800">
+        <div onclick="window.togglePlayPreview('${item.previewUrl || ''}', '${playId}', '${escapeHtml(item.title)}', '${escapeHtml(item.artist)}', '${item.trackId || ''}')" class="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 cursor-pointer shadow border border-slate-800 bg-slate-800">
           <img src="${item.artwork || ''}" class="w-full h-full object-cover">
           <div class="absolute inset-0 bg-black/40 flex items-center justify-center transition ${isPlaying ? 'opacity-100 bg-rose-950/70' : 'opacity-0 hover:opacity-100'}">
             <span class="text-xs text-white">${isPlaying ? '⏹' : '▶'}</span>
@@ -592,7 +598,7 @@ function renderRanking() {
           <div class="text-[10px] text-slate-500 mt-0.5">${item.year}年 • ${escapeHtml(item.genre)}</div>
         </div>
         <div class="flex flex-col items-end gap-1.5 shrink-0">
-          <button onclick="addFromRanking('${encoded}')" class="text-xs px-2.5 py-1 rounded-lg font-bold border transition whitespace-nowrap ${alreadyInList ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-500'}">
+          <button onclick="window.addFromRanking('${encoded}')" class="text-xs px-2.5 py-1 rounded-lg font-bold border transition whitespace-nowrap ${alreadyInList ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-500'}">
             ${alreadyInList ? '登録済' : '＋ 追加'}
           </button>
         </div>
@@ -605,6 +611,7 @@ function renderRanking() {
 window.analyzeAndRecommend = async function() {
   const insightEl = document.getElementById('recommendInsight');
   const listEl = document.getElementById('recommendList');
+  if (!insightEl || !listEl) return;
 
   if (!window.songs || window.songs.length === 0) {
     insightEl.innerHTML = 'マイリストに曲が登録されていません。';
@@ -715,6 +722,7 @@ window.analyzeAndRecommend = async function() {
 
 function renderRecommended() {
   const container = document.getElementById('recommendList');
+  if (!container) return;
   if (recommendedSongs.length === 0) return container.innerHTML = '<div class="text-center text-slate-500 py-12 text-sm">発掘できる新曲が見つかりませんでした</div>';
 
   container.innerHTML = recommendedSongs.map((item, idx) => {
@@ -724,7 +732,7 @@ function renderRecommended() {
     const encoded = encodeURIComponent(JSON.stringify(item));
     return `
       <div class="bg-slate-900/90 border border-slate-800 p-3 rounded-2xl flex items-center gap-3">
-        <div onclick="togglePlayPreview('${item.previewUrl || ''}', '${playId}', '${escapeHtml(item.title)}', '${escapeHtml(item.artist)}')" class="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 cursor-pointer shadow border border-slate-800 bg-slate-800">
+        <div onclick="window.togglePlayPreview('${item.previewUrl || ''}', '${playId}', '${escapeHtml(item.title)}', '${escapeHtml(item.artist)}')" class="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 cursor-pointer shadow border border-slate-800 bg-slate-800">
           ${item.artwork ? `<img src="${item.artwork}" class="w-full h-full object-cover">` : '<div class="w-full h-full flex items-center justify-center text-lg text-slate-600">🎵</div>'}
           <div class="absolute inset-0 bg-black/40 flex items-center justify-center transition ${isPlaying ? 'opacity-100 bg-rose-950/70' : 'opacity-0 hover:opacity-100'}">
             <span class="text-xs text-white">${isPlaying ? '⏹' : '▶'}</span>
@@ -736,7 +744,7 @@ function renderRecommended() {
           <div class="text-[10px] text-indigo-300 mt-0.5 truncate">${escapeHtml(item.reason || '')} ${item.year ? '• ' + item.year + '年' : ''}</div>
         </div>
         <div class="flex flex-col items-end gap-1.5 shrink-0">
-          <button onclick="addFromRanking('${encoded}')" class="text-xs px-2.5 py-1 rounded-lg font-bold border transition whitespace-nowrap ${alreadyInList ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-500'}">
+          <button onclick="window.addFromRanking('${encoded}')" class="text-xs px-2.5 py-1 rounded-lg font-bold border transition whitespace-nowrap ${alreadyInList ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-500'}">
             ${alreadyInList ? '登録済' : '＋ 追加'}
           </button>
         </div>
@@ -748,7 +756,7 @@ function renderRecommended() {
 // iTunes単曲検索
 window.addFromRanking = function(encoded) {
   const data = JSON.parse(decodeURIComponent(encoded));
-  openModal();
+  window.openModal();
   document.getElementById('formTitle').value = data.title;
   document.getElementById('formArtist').value = data.artist;
   document.getElementById('formYear').value = data.year;
@@ -771,7 +779,7 @@ window.searchITunes = async function() {
   const term = document.getElementById('apiSearchInput').value.trim();
   const resultBox = document.getElementById('apiSearchResults');
   const sortRow = document.getElementById('apiSortRow');
-  if (!term) return;
+  if (!term || !resultBox || !sortRow) return;
 
   resultBox.classList.remove('hidden');
   sortRow.classList.add('hidden');
@@ -813,7 +821,7 @@ window.searchITunes = async function() {
     });
 
     sortRow.classList.remove('hidden');
-    renderITunesResults();
+    window.renderITunesResults();
   } catch (e) {
     resultBox.innerHTML = '<div class="text-[11px] text-rose-400 py-1">検索に失敗しました</div>';
   }
@@ -823,6 +831,7 @@ window.renderITunesResults = function() {
   const resultBox = document.getElementById('apiSearchResults');
   const sortMode = document.getElementById('apiSortSelect').value;
   const countEl = document.getElementById('apiResultCount');
+  if (!resultBox || !countEl) return;
   
   let list = [...currentRawITunesResults];
   if (sortMode === 'title') list.sort((a, b) => a.title.localeCompare(b.title, 'ja'));
@@ -834,7 +843,7 @@ window.renderITunesResults = function() {
   resultBox.innerHTML = list.map(item => {
     const rawItem = encodeURIComponent(JSON.stringify(item));
     return `
-      <div onclick="selectITunesSong('${rawItem}')" class="flex items-center gap-2.5 p-2 hover:bg-slate-900 rounded-xl cursor-pointer border border-slate-800 transition">
+      <div onclick="window.selectITunesSong('${rawItem}')" class="flex items-center gap-2.5 p-2 hover:bg-slate-900 rounded-xl cursor-pointer border border-slate-800 transition">
         <img src="${item.artwork || ''}" class="w-10 h-10 rounded-lg object-cover shrink-0 bg-slate-800 shadow">
         <div class="min-w-0 flex-1">
           <div class="text-xs font-bold text-white truncate flex items-center gap-1.5">
@@ -893,6 +902,7 @@ window.renderSetlist = function() {
   const countEl = document.getElementById('setlistBadge');
   const summaryEl = document.getElementById('setlistSummary');
   const container = document.getElementById('setlistItems');
+  if (!container || !countEl || !summaryEl) return;
 
   if (setlist.length > 0) {
     countEl.textContent = setlist.length;
@@ -929,12 +939,12 @@ window.renderSetlist = function() {
           </div>
         </div>
         <div class="flex items-center gap-1 shrink-0">
-          <button onclick="moveSetlistItem(${idx}, -1)" ${idx === 0 ? 'disabled class="opacity-30 p-1"' : 'class="text-slate-400 hover:text-white p-1"'}>▲</button>
-          <button onclick="moveSetlistItem(${idx}, 1)" ${idx === setlist.length - 1 ? 'disabled class="opacity-30 p-1"' : 'class="text-slate-400 hover:text-white p-1"'}>▼</button>
-          <button onclick="recordSung('${s.id}'); removeFromSetlist('${s.id}')" class="bg-indigo-900/60 hover:bg-indigo-900 border border-indigo-700/60 text-indigo-200 px-2 py-0.5 rounded text-[10px] ml-1 whitespace-nowrap">
+          <button onclick="window.moveSetlistItem(${idx}, -1)" ${idx === 0 ? 'disabled class="opacity-30 p-1"' : 'class="text-slate-400 hover:text-white p-1"'}>▲</button>
+          <button onclick="window.moveSetlistItem(${idx}, 1)" ${idx === setlist.length - 1 ? 'disabled class="opacity-30 p-1"' : 'class="text-slate-400 hover:text-white p-1"'}>▼</button>
+          <button onclick="window.recordSung('${s.id}'); window.removeFromSetlist('${s.id}')" class="bg-indigo-900/60 hover:bg-indigo-900 border border-indigo-700/60 text-indigo-200 px-2 py-0.5 rounded text-[10px] ml-1 whitespace-nowrap">
             歌った!
           </button>
-          <button onclick="removeFromSetlist('${s.id}')" class="text-slate-500 hover:text-rose-400 p-1">✕</button>
+          <button onclick="window.removeFromSetlist('${s.id}')" class="text-slate-500 hover:text-rose-400 p-1">✕</button>
         </div>
       </div>
     `;
@@ -946,7 +956,7 @@ window.toggleExpandCard = function(id) {
   if (expandedCardIds.has(id)) expandedCardIds.delete(id);
   else expandedCardIds.add(id);
   updateToggleAllExpandButtonState();
-  render();
+  window.render();
 };
 
 window.toggleAllExpand = function() {
@@ -959,7 +969,7 @@ window.toggleAllExpand = function() {
     isAllExpanded = true;
   }
   updateToggleAllExpandButtonState();
-  render();
+  window.render();
 };
 
 function updateToggleAllExpandButtonState() {
@@ -1035,9 +1045,9 @@ window.render = function() {
   if (genreContainer) {
     genreContainer.innerHTML = '';
     if (allGenres.length > 0) {
-      genreContainer.innerHTML += `<button onclick="setFilterGenre(null)" class="px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 transition ${selectedGenre === null ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">全ジャンル</button>`;
+      genreContainer.innerHTML += `<button onclick="window.setFilterGenre(null)" class="px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 transition ${selectedGenre === null ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">全ジャンル</button>`;
       allGenres.forEach(g => {
-        genreContainer.innerHTML += `<button onclick="setFilterGenre('${g}')" class="px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 transition ${selectedGenre === g ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">${escapeHtml(g)}</button>`;
+        genreContainer.innerHTML += `<button onclick="window.setFilterGenre('${g}')" class="px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 transition ${selectedGenre === g ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">${escapeHtml(g)}</button>`;
       });
     }
   }
@@ -1061,7 +1071,7 @@ window.render = function() {
       allTags.forEach(tag => {
         const isSelected = selectedTags.has(tag);
         tagContainer.innerHTML += `
-          <button onclick="toggleTagFilter('${escapeHtml(tag)}')" class="px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 transition text-[11px] flex items-center gap-1 ${
+          <button onclick="window.toggleTagFilter('${escapeHtml(tag)}')" class="px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 transition text-[11px] flex items-center gap-1 ${
             isSelected ? 'bg-indigo-600 text-white font-bold shadow-sm' : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-white'
           }">
             <span>#${escapeHtml(tag)}</span>
@@ -1096,12 +1106,12 @@ window.render = function() {
       <div class="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-sm transition overflow-hidden">
         <div class="p-3 flex items-center gap-2.5">
           ${s.artwork ? `
-            <img src="${s.artwork}" onclick="toggleExpandCard('${s.id}')" class="w-12 h-12 rounded-xl object-cover shrink-0 bg-slate-800 shadow border border-slate-800/80 cursor-pointer">
+            <img src="${s.artwork}" onclick="window.toggleExpandCard('${s.id}')" class="w-12 h-12 rounded-xl object-cover shrink-0 bg-slate-800 shadow border border-slate-800/80 cursor-pointer">
           ` : `
-            <div onclick="toggleExpandCard('${s.id}')" class="w-12 h-12 rounded-xl bg-slate-800 border border-slate-800/80 flex items-center justify-center shrink-0 text-lg text-slate-600 cursor-pointer">🎵</div>
+            <div onclick="window.toggleExpandCard('${s.id}')" class="w-12 h-12 rounded-xl bg-slate-800 border border-slate-800/80 flex items-center justify-center shrink-0 text-lg text-slate-600 cursor-pointer">🎵</div>
           `}
 
-          <div class="min-w-0 flex-1 cursor-pointer" onclick="toggleExpandCard('${s.id}')">
+          <div class="min-w-0 flex-1 cursor-pointer" onclick="window.toggleExpandCard('${s.id}')">
             <div class="flex items-center gap-1.5">
               <div class="font-bold text-sm text-white truncate">${escapeHtml(s.title)}</div>
               <span class="text-[10px] px-1.5 py-0.2 rounded font-mono font-bold whitespace-nowrap shrink-0 ${
@@ -1126,10 +1136,10 @@ window.render = function() {
           </div>
 
           <div class="flex flex-col items-end gap-1 shrink-0">
-            <button onclick="${inSetlist ? `removeFromSetlist('${s.id}')` : `addToSetlist('${s.id}')`}" class="text-[11px] px-2.5 py-1 rounded-lg font-medium border transition whitespace-nowrap ${inSetlist ? 'bg-indigo-900/80 border-indigo-600 text-indigo-200' : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'}">
+            <button onclick="${inSetlist ? `window.removeFromSetlist('${s.id}')` : `window.addToSetlist('${s.id}')`}" class="text-[11px] px-2.5 py-1 rounded-lg font-medium border transition whitespace-nowrap ${inSetlist ? 'bg-indigo-900/80 border-indigo-600 text-indigo-200' : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'}">
               ${inSetlist ? '✓ セトリ中' : '＋ セトリ'}
             </button>
-            <button onclick="toggleExpandCard('${s.id}')" class="text-slate-500 hover:text-slate-300 text-xs px-1 py-0.5 flex items-center gap-0.5">
+            <button onclick="window.toggleExpandCard('${s.id}')" class="text-slate-500 hover:text-slate-300 text-xs px-1 py-0.5 flex items-center gap-0.5">
               <span class="text-[9px]">${isExpanded ? '閉じる' : '詳細'}</span>
               <span>${isExpanded ? '▲' : '▼'}</span>
             </button>
@@ -1156,18 +1166,18 @@ window.render = function() {
 
             <div class="flex items-center justify-between pt-1 gap-1 text-[11px] overflow-x-auto no-scrollbar">
               <div class="flex items-center gap-1.5 shrink-0">
-                <button onclick="recordSung('${s.id}')" class="text-indigo-300 hover:text-white bg-indigo-900/60 hover:bg-indigo-900 border border-indigo-700/60 px-2.5 py-1 rounded-lg font-medium transition whitespace-nowrap">
+                <button onclick="window.recordSung('${s.id}')" class="text-indigo-300 hover:text-white bg-indigo-900/60 hover:bg-indigo-900 border border-indigo-700/60 px-2.5 py-1 rounded-lg font-medium transition whitespace-nowrap">
                   🎤 歌った！
                 </button>
                 ${hasUndo ? `
-                  <button onclick="undoSung('${s.id}')" class="text-amber-400 hover:text-amber-300 bg-amber-950/60 border border-amber-800/80 px-1.5 py-1 rounded-lg font-medium text-[10px] whitespace-nowrap">
+                  <button onclick="window.undoSung('${s.id}')" class="text-amber-400 hover:text-amber-300 bg-amber-950/60 border border-amber-800/80 px-1.5 py-1 rounded-lg font-medium text-[10px] whitespace-nowrap">
                     ↩ 取消
                   </button>
                 ` : ''}
               </div>
 
               <div class="flex items-center gap-1 shrink-0">
-                <button onclick="togglePlayPreview('${s.previewUrl \vert{}\vert{} ''}', '${s.id}', '${escapeHtml(s.title)}', '${escapeHtml(s.artist)}')" class="px-2 py-1 rounded-lg font-medium border flex items-center gap-1 whitespace-nowrap ${isPlaying ? 'bg-rose-900 border-rose-700 text-rose-200' : 'bg-slate-800 border-slate-700 text-slate-300'}">
+                <button onclick="window.togglePlayPreview('${s.previewUrl \vert{}\vert{} ''}', '${s.id}', '${escapeHtml(s.title)}', '${escapeHtml(s.artist)}')" class="px-2 py-1 rounded-lg font-medium border flex items-center gap-1 whitespace-nowrap ${isPlaying ? 'bg-rose-900 border-rose-700 text-rose-200' : 'bg-slate-800 border-slate-700 text-slate-300'}">
                   ${isPlaying ? '⏹ 停止' : '▶ 試聴'}
                 </button>
                 <a href="${lyricsSearchUrl}" target="_blank" rel="noopener" class="text-slate-400 hover:text-sky-400 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700 flex items-center gap-1 whitespace-nowrap">
@@ -1176,8 +1186,8 @@ window.render = function() {
                 <a href="https://www.youtube.com/results?search_query=${encodeURIComponent((s.artist ? s.artist + ' ' : '') + s.title)}" target="_blank" rel="noopener" class="text-slate-400 hover:text-red-400 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700 flex items-center gap-1 whitespace-nowrap">
                   ▶️ YT
                 </a>
-                <button onclick="openEditModal('${s.id}')" class="text-slate-400 hover:text-indigo-400 bg-slate-800 border border-slate-700 p-1 rounded-lg text-xs" title="編集">✏️</button>
-                <button onclick="deleteSong('${s.id}')" class="text-slate-500 hover:text-rose-400 bg-slate-800 border border-slate-700 p-1 rounded-lg text-xs" title="削除">🗑️</button>
+                <button onclick="window.openEditModal('${s.id}')" class="text-slate-400 hover:text-indigo-400 bg-slate-800 border border-slate-700 p-1 rounded-lg text-xs" title="編集">✏️</button>
+                <button onclick="window.deleteSong('${s.id}')" class="text-slate-500 hover:text-rose-400 bg-slate-800 border border-slate-700 p-1 rounded-lg text-xs" title="削除">🗑️</button>
               </div>
             </div>
           </div>
@@ -1190,14 +1200,14 @@ window.render = function() {
 window.toggleTagFilter = function(tag) {
   if (selectedTags.has(tag)) selectedTags.delete(tag);
   else selectedTags.add(tag);
-  render();
+  window.render();
 };
-window.clearSelectedTags = function() { selectedTags.clear(); render(); };
+window.clearSelectedTags = function() { selectedTags.clear(); window.render(); };
 window.setTagFilterMode = function(mode) {
   tagFilterMode = mode;
   document.getElementById('tagModeAnd').className = mode === 'AND' ? "px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-600 text-white" : "px-1.5 py-0.5 rounded text-[9px] text-slate-400 hover:text-white";
   document.getElementById('tagModeOr').className = mode === 'OR' ? "px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-600 text-white" : "px-1.5 py-0.5 rounded text-[9px] text-slate-400 hover:text-white";
-  render();
+  window.render();
 };
 window.setScoreFilter = function(score) {
   selectedScore = score;
@@ -1206,7 +1216,7 @@ window.setScoreFilter = function(score) {
       ? 'score-tab px-2 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0' 
       : 'score-tab px-2 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0';
   });
-  render();
+  window.render();
 };
 window.setDecadeFilter = function(decade) {
   selectedDecade = decade;
@@ -1215,7 +1225,7 @@ window.setDecadeFilter = function(decade) {
       ? 'decade-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0' 
       : 'decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0';
   });
-  render();
+  window.render();
 };
 window.setAttrFilter = function(attr) {
   selectedAttr = attr;
@@ -1224,9 +1234,9 @@ window.setAttrFilter = function(attr) {
       ? 'attr-tab px-2 py-0.5 rounded-md bg-slate-800 text-white font-medium whitespace-nowrap shrink-0' 
       : 'attr-tab px-2 py-0.5 rounded-md bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0';
   });
-  render();
+  window.render();
 };
-window.setFilterGenre = function(g) { selectedGenre = g; render(); };
+window.setFilterGenre = function(g) { selectedGenre = g; window.render(); };
 
 window.recordSung = async function(id) {
   if (!window.firestoreOps) return;
@@ -1234,7 +1244,7 @@ window.recordSung = async function(id) {
   if (!target) return;
 
   undoHistory[id] = { lastSungAt: target.lastSungAt || null, singCount: target.singCount || 0 };
-  render();
+  window.render();
 
   const { doc, updateDoc } = window.firestoreOps;
   await updateDoc(doc(window.db, "songs", id), { 
@@ -1245,7 +1255,7 @@ window.recordSung = async function(id) {
   setTimeout(() => {
     if (undoHistory[id] !== undefined) {
       delete undoHistory[id];
-      render();
+      window.render();
     }
   }, 10000);
 };
@@ -1254,7 +1264,7 @@ window.undoSung = async function(id) {
   if (!window.firestoreOps || undoHistory[id] === undefined) return;
   const prev = undoHistory[id];
   delete undoHistory[id];
-  render();
+  window.render();
 
   const { doc, updateDoc } = window.firestoreOps;
   await updateDoc(doc(window.db, "songs", id), { 
@@ -1291,7 +1301,7 @@ window.openModal = function() {
   document.getElementById('modalTitle').textContent = '🎵 曲を登録';
   document.getElementById('modalTabContainer').classList.remove('hidden');
   document.getElementById('resetSungRow').classList.add('hidden');
-  switchModalTab('single');
+  window.switchModalTab('single');
   document.getElementById('modal').classList.remove('hidden');
 };
 
@@ -1303,7 +1313,7 @@ window.openEditModal = function(id) {
   document.getElementById('editSongId').value = s.id;
   document.getElementById('modalTitle').textContent = '✏️ 曲を編集';
   document.getElementById('modalTabContainer').classList.add('hidden');
-  switchModalTab('single');
+  window.switchModalTab('single');
 
   document.getElementById('formTitle').value = s.title || '';
   document.getElementById('formArtist').value = s.artist || '';
@@ -1385,13 +1395,13 @@ window.handleSave = async function(e) {
       lastSungAt: null
     });
   }
-  closeModal();
+  window.closeModal();
 };
 
 window.deleteSong = async function(id) {
   if (confirm('この曲を削除しますか？')) {
     if (!window.firestoreOps) return;
-    removeFromSetlist(id);
+    window.removeFromSetlist(id);
     const { doc, deleteDoc } = window.firestoreOps;
     await deleteDoc(doc(window.db, "songs", id));
   }
@@ -1414,5 +1424,10 @@ window.closeRandom = function() {
   document.getElementById('randomBanner').classList.add('hidden');
 };
 
-// 初期マウント
-render();
+// 初期マウント実行
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => { window.render(); window.renderSetlist(); });
+} else {
+  window.render();
+  window.renderSetlist();
+}
