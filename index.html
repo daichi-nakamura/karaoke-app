@@ -102,7 +102,7 @@
       <div id="tagFilterList" class="flex gap-1.5 overflow-x-auto no-scrollbar text-xs pt-1"></div>
     </div>
 
-    <!-- 完成度 & 全展開/並び順（2段構成で被り解消） -->
+    <!-- 完成度 & 全展開/並び順（2段構成） -->
     <div class="space-y-1.5 pt-1">
       <div class="flex gap-1 overflow-x-auto no-scrollbar py-0.5" id="scoreTabs">
         <button onclick="setScoreFilter('all')" class="score-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0 text-xs" data-val="all">すべて</button>
@@ -330,11 +330,11 @@
           <div class="grid grid-cols-2 gap-2 bg-slate-950/60 p-2 rounded-xl border border-slate-800/80">
             <div>
               <label class="block text-[11px] text-amber-400 mb-1">🔥 最高音</label>
-              <input type="text" id="formMaxPitch" placeholder="例: hiA, mid2G" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-500">
+              <input type="text" id="formMaxPitch" placeholder="例: hiA, mid2G" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-500">
             </div>
             <div>
               <label class="block text-[11px] text-sky-400 mb-1">💧 最低音</label>
-              <input type="text" id="formMinPitch" placeholder="例: mid1D, lowG" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-sky-500">
+              <input type="text" id="formMinPitch" placeholder="例: mid1D, lowG" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-sky-500">
             </div>
           </div>
 
@@ -361,8 +361,8 @@
               <label class="block text-xs text-slate-400 mb-1">完成度</label>
               <select id="formScore" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 focus:outline-none">
                 <option value="得意">得意</option>
-                <option value="歌える" selected>歌える</option>
-                <option value="練習中">練習中</option>
+                <option value="歌える">歌える</option>
+                <option value="練習中" selected>練習中</option>
               </select>
             </div>
             <div>
@@ -411,11 +411,14 @@
         <textarea id="bulkTextInput" rows="5" placeholder="白日 King Gnu&#10;Lemon 米津玄師&#10;怪獣の花唄&#10;天体観測&#10;丸の内サディスティック" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 leading-relaxed"></textarea>
 
         <div class="flex gap-2">
+          <button type="button" onclick="closeModal()" class="px-3 bg-slate-800 text-slate-300 hover:text-white py-2 rounded-lg text-xs font-semibold">
+            キャンセル
+          </button>
+          <button type="button" onclick="document.getElementById('bulkTextInput').value=''" class="px-3 bg-slate-850 text-slate-400 hover:text-white py-2 rounded-lg text-xs font-semibold border border-slate-800">
+            クリア
+          </button>
           <button type="button" id="btnBulkSearch" onclick="processBulkSearch()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1">
             <span>⚡ 一括検索して確認</span>
-          </button>
-          <button type="button" onclick="document.getElementById('bulkTextInput').value=''" class="px-3 bg-slate-800 text-slate-400 hover:text-white py-2 rounded-lg text-xs font-semibold">
-            クリア
           </button>
         </div>
 
@@ -424,7 +427,7 @@
         <div id="bulkPreviewArea" class="hidden space-y-2 pt-1">
           <div class="flex justify-between items-center text-[11px] text-slate-400 px-0.5">
             <span id="bulkFoundCount">0件取得</span>
-            <span class="text-[10px] text-slate-500">✏️で修正、✕で除外</span>
+            <span class="text-[10px] text-slate-500">バッジタップで完成度変更</span>
           </div>
 
           <div id="bulkPreviewList" class="max-h-60 overflow-y-auto no-scrollbar space-y-2"></div>
