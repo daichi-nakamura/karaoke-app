@@ -11,7 +11,7 @@
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen pb-24 font-sans select-none">
+<body class="bg-slate-950 text-slate-100 min-h-screen pb-32 font-sans select-none">
 
   <!-- ヘッダー -->
   <header class="sticky top-0 z-20 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 py-3">
@@ -20,9 +20,15 @@
         <span class="text-xl">🎤</span>
         <h1 class="text-lg font-bold tracking-tight">マイカラオケリスト</h1>
       </div>
-      <button onclick="openModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow flex items-center gap-1 transition">
-        ＋ 追加
-      </button>
+      <div class="flex items-center gap-2">
+        <button onclick="toggleSetlistDrawer()" class="relative bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
+          📋 セトリ
+          <span id="setlistBadge" class="hidden bg-indigo-500 text-white rounded-full px-1.5 py-0.2 text-[10px] font-mono">0</span>
+        </button>
+        <button onclick="openModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow flex items-center gap-1 transition">
+          ＋ 追加
+        </button>
+      </div>
     </div>
   </header>
 
@@ -30,9 +36,9 @@
     <!-- ステータス通知 -->
     <div id="statusBanner" class="hidden text-xs p-2.5 rounded-xl border"></div>
 
-    <!-- 検索 & ランダム選曲 -->
+    <!-- 検索バー（歌詞・ジャンル・タグ横断検索） -->
     <div class="flex gap-2">
-      <input type="text" id="searchInput" oninput="render()" placeholder="曲名・歌手・タグ・年代で検索..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-500">
+      <input type="text" id="searchInput" oninput="render()" placeholder="曲名・歌手・歌詞・ジャンル・音域で検索..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm placeholder:text-slate-600 text-slate-100 focus:outline-none focus:border-indigo-500">
       <button onclick="pickRandom()" class="bg-slate-900 border border-slate-800 px-3.5 py-2.5 rounded-xl text-lg hover:bg-slate-800 transition" title="ランダム選曲">🎲</button>
     </div>
 
@@ -55,16 +61,16 @@
       </div>
       <select id="sortSelect" onchange="render()" class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-slate-300 focus:outline-none shrink-0">
         <option value="lastSung">最近歌った順</option>
-        <option value="releaseYear">リリース年が新しい順</option>
-        <option value="newest">新しく追加した順</option>
+        <option value="releaseYear">リリース年順</option>
+        <option value="newest">登録が新しい順</option>
         <option value="title">曲名順 (昇順)</option>
       </select>
     </div>
 
-    <!-- タグ絞り込み -->
+    <!-- 自動抽出タグ絞り込み -->
     <div id="tagList" class="flex gap-1.5 overflow-x-auto no-scrollbar text-xs"></div>
 
-    <!-- ランダム選曲結果 -->
+    <!-- ランダム選曲ポップアップ -->
     <div id="randomBanner" class="hidden bg-indigo-950/90 border border-indigo-500/60 p-4 rounded-2xl relative shadow-xl">
       <div class="text-xs font-bold text-indigo-400 mb-1">🎲 おすすめの1曲！</div>
       <div id="randomTitle" class="text-lg font-bold text-white"></div>
@@ -83,19 +89,36 @@
     <div id="songList" class="space-y-3"></div>
   </main>
 
+  <!-- セトリ管理ドロワー（画面下部・ポップアップ） -->
+  <div id="setlistDrawer" class="fixed inset-x-0 bottom-0 z-40 bg-slate-900/98 backdrop-blur border-t border-slate-800 p-4 transform translate-y-full transition-transform duration-300 max-w-md mx-auto rounded-t-2xl shadow-2xl space-y-3">
+    <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+      <div class="flex items-center gap-2">
+        <span class="text-base">📋</span>
+        <h3 class="font-bold text-sm text-white">本日の歌う曲順ルーティン</h3>
+        <span id="setlistDrawerCount" class="text-xs text-indigo-400 font-mono">0曲</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="clearSetlist()" class="text-[11px] text-slate-400 hover:text-rose-400">全クリア</button>
+        <button onclick="toggleSetlistDrawer()" class="text-slate-400 text-sm p-1">✕</button>
+      </div>
+    </div>
+    
+    <div id="setlistItems" class="max-h-60 overflow-y-auto no-scrollbar space-y-2"></div>
+  </div>
+
   <!-- 追加・編集モーダル -->
   <div id="modal" class="fixed inset-0 z-50 bg-black/75 hidden flex items-center justify-center p-4 overflow-y-auto">
     <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-5 shadow-2xl my-auto space-y-3">
       <h2 id="modalTitle" class="text-base font-bold flex items-center gap-1.5 text-white">🎵 曲を登録</h2>
       
-      <!-- iTunes自動補完検索 -->
+      <!-- iTunes自動取得 -->
       <div class="bg-slate-950 border border-slate-800 p-2.5 rounded-xl space-y-2">
-        <div class="text-[11px] font-bold text-indigo-400">⚡ Apple Music / iTunes でメタデータ自動取得</div>
+        <div class="text-[11px] font-bold text-indigo-400 flex justify-between items-center">
+          <span>⚡ メタデータ & タグを自動取得</span>
+        </div>
         <div class="flex gap-1.5">
-          <input type="text" id="apiSearchInput" placeholder="曲名や歌手名を入力..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none">
-          <button type="button" onclick="searchITunes()" class="bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold">
-            検索
-          </button>
+          <input type="text" id="apiSearchInput" placeholder="曲名や歌手名を入力..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-slate-600 focus:outline-none">
+          <button type="button" onclick="searchITunes()" class="bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold">検索</button>
         </div>
         <div id="apiSearchResults" class="max-h-48 overflow-y-auto no-scrollbar space-y-1.5 hidden"></div>
       </div>
@@ -105,33 +128,46 @@
         <input type="hidden" id="formArtwork" value="">
         <input type="hidden" id="formPreviewUrl" value="">
         <input type="hidden" id="formDuration" value="">
+        <input type="hidden" id="formLastSungAt" value="">
 
         <div class="grid grid-cols-3 gap-2">
           <div class="col-span-2">
             <label class="block text-xs text-slate-400 mb-1">曲名 *</label>
-            <input type="text" id="formTitle" required placeholder="例: 白日" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-100 focus:outline-none focus:border-indigo-500">
+            <input type="text" id="formTitle" required placeholder="例: 白日" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500">
           </div>
           <div>
             <label class="block text-xs text-slate-400 mb-1">リリース年</label>
-            <input type="number" id="formYear" placeholder="2019" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-100 focus:outline-none focus:border-indigo-500">
+            <input type="number" id="formYear" placeholder="2019" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500">
           </div>
         </div>
 
         <div class="grid grid-cols-2 gap-2">
           <div>
             <label class="block text-xs text-slate-400 mb-1">歌手名</label>
-            <input type="text" id="formArtist" placeholder="例: King Gnu" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-100 focus:outline-none focus:border-indigo-500">
+            <input type="text" id="formArtist" placeholder="例: King Gnu" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500">
           </div>
           <div>
             <label class="block text-xs text-slate-400 mb-1">ジャンル</label>
-            <input type="text" id="formGenre" placeholder="J-Pop" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-100 focus:outline-none focus:border-indigo-500">
+            <input type="text" id="formGenre" placeholder="J-Pop" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500">
+          </div>
+        </div>
+
+        <!-- 音域設定 -->
+        <div class="grid grid-cols-2 gap-2 bg-slate-950/60 p-2 rounded-xl border border-slate-800/80">
+          <div>
+            <label class="block text-[11px] text-amber-400 mb-1">🔥 最高音</label>
+            <input type="text" id="formMaxPitch" placeholder="例: hiA, mid2G" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-500">
+          </div>
+          <div>
+            <label class="block text-[11px] text-sky-400 mb-1">💧 最低音</label>
+            <input type="text" id="formMinPitch" placeholder="例: mid1D, lowG" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-sky-500">
           </div>
         </div>
 
         <div class="grid grid-cols-2 gap-2">
           <div>
             <label class="block text-xs text-slate-400 mb-1">キー設定</label>
-            <select id="formKey" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-100 focus:outline-none">
+            <select id="formKey" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 focus:outline-none">
               <option value="-6">-6</option>
               <option value="-5">-5</option>
               <option value="-4">-4</option>
@@ -149,7 +185,7 @@
           </div>
           <div>
             <label class="block text-xs text-slate-400 mb-1">完成度</label>
-            <select id="formScore" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-100 focus:outline-none">
+            <select id="formScore" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 focus:outline-none">
               <option value="得意">得意</option>
               <option value="歌える" selected>歌える</option>
               <option value="練習中">練習中</option>
@@ -158,13 +194,17 @@
         </div>
 
         <div>
-          <label class="block text-xs text-slate-400 mb-1">タグ（カンマ区切り）</label>
-          <input type="text" id="formTags" placeholder="盛り上がる, アニソン, バラード" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-100 focus:outline-none focus:border-indigo-500">
+          <label class="block text-xs text-slate-400 mb-1">自動タグ（自動付与＋手動調整可）</label>
+          <input type="text" id="formTags" placeholder="カンマ区切りで入力" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500">
         </div>
 
         <div>
-          <label class="block text-xs text-slate-400 mb-1">メモ・歌詞の出だし</label>
-          <textarea id="formMemo" rows="2" placeholder="歌い出し『時には誰かを...』、サビ高音など" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-100 resize-none focus:outline-none focus:border-indigo-500"></textarea>
+          <label class="block text-xs text-slate-400 mb-1">歌詞の出だし・メモ（検索対象）</label>
+          <textarea id="formMemo" rows="2" placeholder="歌い出し『時には誰かを...』、サビ高音など" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 resize-none focus:outline-none focus:border-indigo-500"></textarea>
+        </div>
+
+        <div id="resetSungRow" class="hidden pt-1">
+          <button type="button" onclick="clearSungHistory()" class="text-xs text-slate-400 hover:text-rose-400 underline">歌唱履歴をクリアする</button>
         </div>
 
         <div class="flex gap-2 pt-1">
@@ -175,7 +215,7 @@
     </div>
   </div>
 
-  <!-- Firebase & アプリロジック -->
+  <!-- Firebase & スクリプト -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
     import { 
@@ -190,7 +230,7 @@
       orderBy 
     } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 
-    // ★★★ ここにご自身のFirebaseキーを貼り付けてください ★★★
+    // ★★★ ご自身のFirebase設定 ★★★
     const firebaseConfig = {
   apiKey: "AIzaSyCGxnALF5RNC1RvhE-IOEWDrHNnf4a56r4",
   authDomain: "karaoke-app-7feaf.firebaseapp.com",
@@ -223,6 +263,7 @@
           window.songs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           document.getElementById('statusBanner').classList.add('hidden');
           window.render();
+          window.renderSetlist();
         }, (err) => {
           showStatus("⚠️ 通信エラー: " + err.message, true);
         });
@@ -234,20 +275,50 @@
 
   <script>
     window.songs = [];
+    let setlist = JSON.parse(localStorage.getItem('karaoke_setlist')) || [];
     let selectedTag = null;
     let selectedScore = 'all';
     let selectedDecade = 'all';
     let currentAudio = null;
     let currentPlayingId = null;
+    let undoHistory = {};
 
-    // iTunes API検索
+    function saveSetlist() {
+      localStorage.setItem('karaoke_setlist', JSON.stringify(setlist));
+      renderSetlist();
+    }
+
+    // 自動タグ生成ロジック
+    function generateAutoTags(item) {
+      const tags = [];
+      const yr = parseInt(item.year, 10);
+      if (yr >= 2020) tags.push('2020年代');
+      else if (yr >= 2010) tags.push('2010年代');
+      else if (yr >= 2000) tags.push('2000年代');
+      else if (yr < 2000) tags.push('90年代以前');
+
+      if (item.genre) {
+        if (item.genre.toLowerCase().includes('anime') || item.genre.includes('アニメ')) tags.push('アニソン');
+        else if (item.genre.toLowerCase().includes('rock')) tags.push('ロック');
+        else if (item.genre.toLowerCase().includes('pop')) tags.push('J-Pop');
+        else tags.push(item.genre);
+      }
+
+      if (item.durationMs) {
+        if (item.durationMs < 190000) tags.push('短め');
+        else if (item.durationMs > 300000) tags.push('長尺');
+      }
+
+      return Array.from(new Set(tags));
+    }
+
     window.searchITunes = async function() {
       const term = document.getElementById('apiSearchInput').value.trim();
       const resultBox = document.getElementById('apiSearchResults');
       if (!term) return;
 
       resultBox.classList.remove('hidden');
-      resultBox.innerHTML = '<div class="text-[11px] text-slate-400 py-1">検索中...</div>';
+      resultBox.innerHTML = '<div class="text-[11px] text-slate-500 py-1">検索中...</div>';
 
       try {
         const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=jp&entity=song&limit=6`);
@@ -257,11 +328,13 @@
           return;
         }
 
-        resultBox.innerHTML = data.results.map((item, idx) => {
+        resultBox.innerHTML = data.results.map((item) => {
           const year = item.releaseDate ? item.releaseDate.substring(0, 4) : '';
           const mins = Math.floor((item.trackTimeMillis || 0) / 60000);
           const secs = Math.floor(((item.trackTimeMillis || 0) % 60000) / 1000).toString().padStart(2, '0');
           const duration = item.trackTimeMillis ? `${mins}:${secs}` : '';
+          const autoTags = generateAutoTags({ year, genre: item.primaryGenreName, durationMs: item.trackTimeMillis });
+          
           const rawItem = encodeURIComponent(JSON.stringify({
             title: item.trackName,
             artist: item.artistName,
@@ -269,7 +342,8 @@
             genre: item.primaryGenreName || '',
             artwork: item.artworkUrl100 || '',
             previewUrl: item.previewUrl || '',
-            duration: duration
+            duration: duration,
+            autoTags: autoTags
           }));
 
           return `
@@ -277,7 +351,8 @@
               <img src="${item.artworkUrl100 || ''}" class="w-10 h-10 rounded-lg object-cover shrink-0 bg-slate-800 shadow">
               <div class="min-w-0 flex-1">
                 <div class="text-xs font-bold text-white truncate">${escapeHtml(item.trackName)}</div>
-                <div class="text-[10px] text-slate-400 truncate">${escapeHtml(item.artistName)} • ${year || '年不明'} • ${item.primaryGenreName || ''}</div>
+                <div class="text-[10px] text-slate-500 truncate">${escapeHtml(item.artistName)} • ${year || '年不明'} • ${item.primaryGenreName || ''}</div>
+                <div class="text-[9px] text-indigo-400 mt-0.5 truncate">自動タグ: ${autoTags.join(', ')}</div>
               </div>
             </div>
           `;
@@ -296,10 +371,90 @@
       document.getElementById('formArtwork').value = data.artwork;
       document.getElementById('formPreviewUrl').value = data.previewUrl;
       document.getElementById('formDuration').value = data.duration;
+      document.getElementById('formTags').value = (data.autoTags || []).join(', ');
       document.getElementById('apiSearchResults').classList.add('hidden');
     };
 
-    // 30秒試聴プレビュー再生
+    // セトリ管理
+    window.toggleSetlistDrawer = function() {
+      const drawer = document.getElementById('setlistDrawer');
+      drawer.classList.toggle('translate-y-full');
+    };
+
+    window.addToSetlist = function(id) {
+      if (!setlist.includes(id)) {
+        setlist.push(id);
+        saveSetlist();
+      }
+      const drawer = document.getElementById('setlistDrawer');
+      drawer.classList.remove('translate-y-full');
+    };
+
+    window.removeFromSetlist = function(id) {
+      setlist = setlist.filter(x => x !== id);
+      saveSetlist();
+    };
+
+    window.moveSetlistItem = function(idx, direction) {
+      const targetIdx = idx + direction;
+      if (targetIdx < 0 || targetIdx >= setlist.length) return;
+      const temp = setlist[idx];
+      setlist[idx] = setlist[targetIdx];
+      setlist[targetIdx] = temp;
+      saveSetlist();
+    };
+
+    window.clearSetlist = function() {
+      if (confirm('歌う曲順セトリをすべてクリアしますか？')) {
+        setlist = [];
+        saveSetlist();
+      }
+    };
+
+    window.renderSetlist = function() {
+      const countEl = document.getElementById('setlistBadge');
+      const drawerCountEl = document.getElementById('setlistDrawerCount');
+      const container = document.getElementById('setlistItems');
+
+      if (setlist.length > 0) {
+        countEl.textContent = setlist.length;
+        countEl.classList.remove('hidden');
+        drawerCountEl.textContent = `${setlist.length}曲`;
+      } else {
+        countEl.classList.add('hidden');
+        drawerCountEl.textContent = '0曲';
+      }
+
+      if (setlist.length === 0) {
+        container.innerHTML = '<div class="text-center text-slate-500 py-6 text-xs">セトリに曲がありません。「＋ セトリに追加」を押して登録してください</div>';
+        return;
+      }
+
+      container.innerHTML = setlist.map((songId, idx) => {
+        const s = (window.songs || []).find(x => x.id === songId);
+        if (!s) return '';
+        return `
+          <div class="flex items-center justify-between gap-2 p-2 bg-slate-950/80 border border-slate-800 rounded-xl text-xs">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="font-mono font-bold text-indigo-400 w-4 text-center shrink-0">${idx + 1}</span>
+              <div class="min-w-0">
+                <div class="font-bold text-white truncate">${escapeHtml(s.title)}</div>
+                <div class="text-[10px] text-slate-400 truncate">${escapeHtml(s.artist)} • ${s.key === '0' ? '原曲' : 'キー ' + s.key}</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+              <button onclick="moveSetlistItem(${idx}, -1)" ${idx === 0 ? 'disabled class="opacity-30 p-1"' : 'class="text-slate-400 hover:text-white p-1"'}>▲</button>
+              <button onclick="moveSetlistItem(${idx}, 1)" ${idx === setlist.length - 1 ? 'disabled class="opacity-30 p-1"' : 'class="text-slate-400 hover:text-white p-1"'}>▼</button>
+              <button onclick="recordSung('${s.id}'); removeFromSetlist('${s.id}')" class="bg-indigo-900/60 hover:bg-indigo-900 border border-indigo-700/60 text-indigo-200 px-2 py-0.5 rounded text-[10px] ml-1">
+                歌った!
+              </button>
+              <button onclick="removeFromSetlist('${s.id}')" class="text-slate-500 hover:text-rose-400 p-1">✕</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    };
+
     window.togglePlayPreview = function(url, id) {
       if (!url) return;
       if (currentPlayingId === id && currentAudio) {
@@ -342,16 +497,18 @@
       const sortMode = document.getElementById('sortSelect').value;
 
       let filtered = (window.songs || []).filter(s => {
+        // 全文検索（歌詞・ジャンル・タグ・音域・メモをすべて網羅）
         const matchesQuery = (s.title || '').toLowerCase().includes(queryStr) || 
                              (s.artist || '').toLowerCase().includes(queryStr) ||
                              (s.memo || '').toLowerCase().includes(queryStr) ||
                              (s.genre || '').toLowerCase().includes(queryStr) ||
+                             (s.maxPitch || '').toLowerCase().includes(queryStr) ||
+                             (s.minPitch || '').toLowerCase().includes(queryStr) ||
                              (s.year ? s.year.toString().includes(queryStr) : false) ||
                              (s.tags && s.tags.some(t => t.toLowerCase().includes(queryStr)));
         const matchesTag = selectedTag ? s.tags && s.tags.includes(selectedTag) : true;
         const matchesScore = selectedScore === 'all' ? true : s.score === selectedScore;
         
-        // 年代判定
         let matchesDecade = true;
         const yr = parseInt(s.year, 10);
         if (selectedDecade === '2020s') matchesDecade = yr >= 2020;
@@ -369,7 +526,6 @@
         return (b.createdAt || 0) - (a.createdAt || 0);
       });
 
-      // タグ一覧
       const allTags = Array.from(new Set((window.songs || []).flatMap(s => s.tags || [])));
       const tagContainer = document.getElementById('tagList');
       tagContainer.innerHTML = '';
@@ -391,18 +547,18 @@
       listContainer.innerHTML = filtered.map(s => {
         const isPlaying = currentPlayingId === s.id;
         const lyricsSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(s.title + ' ' + (s.artist || '') + ' 歌詞')}`;
+        const hasUndo = undoHistory[s.id] !== undefined;
+        const inSetlist = setlist.includes(s.id);
 
         return `
           <div class="bg-slate-900/90 border border-slate-800 p-3.5 rounded-2xl flex flex-col gap-2.5 shadow-sm">
             <div class="flex items-start gap-3">
-              <!-- ジャケット画像 -->
               ${s.artwork ? `
                 <img src="${s.artwork}" class="w-14 h-14 rounded-xl object-cover shrink-0 bg-slate-800 shadow border border-slate-800/80">
               ` : `
-                <div class="w-14 h-14 rounded-xl bg-slate-800 border border-slate-800/80 flex items-center justify-center shrink-0 text-xl text-slate-500">🎵</div>
+                <div class="w-14 h-14 rounded-xl bg-slate-800 border border-slate-800/80 flex items-center justify-center shrink-0 text-xl text-slate-600">🎵</div>
               `}
 
-              <!-- 曲情報 -->
               <div class="flex-1 min-w-0">
                 <div class="flex justify-between items-start gap-1">
                   <div class="font-bold text-base text-white truncate">${escapeHtml(s.title)}</div>
@@ -419,7 +575,7 @@
 
                 <div class="text-xs text-slate-400 truncate mt-0.5">${escapeHtml(s.artist) || '歌手未設定'}</div>
 
-                <!-- メタ情報バッジ（年・時間・ジャンル・完成度） -->
+                <!-- メタ情報バッジ -->
                 <div class="flex items-center gap-1.5 flex-wrap mt-1 text-[10px]">
                   <span class="px-1.5 py-0.5 rounded font-medium ${
                     s.score === '得意' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/80' :
@@ -429,19 +585,28 @@
                   ${s.year ? `<span class="bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700/60 font-mono">${s.year}年</span>` : ''}
                   ${s.duration ? `<span class="bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700/60 font-mono">${s.duration}</span>` : ''}
                   ${s.genre ? `<span class="bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700/60">${escapeHtml(s.genre)}</span>` : ''}
+                  ${s.maxPitch ? `<span class="bg-amber-950/70 text-amber-300 px-1.5 py-0.5 rounded border border-amber-800/60 font-mono">最高 ${escapeHtml(s.maxPitch)}</span>` : ''}
+                  ${s.minPitch ? `<span class="bg-sky-950/70 text-sky-300 px-1.5 py-0.5 rounded border border-sky-800/60 font-mono">最低 ${escapeHtml(s.minPitch)}</span>` : ''}
                 </div>
               </div>
             </div>
 
             ${s.memo ? `<div class="text-xs text-slate-300 bg-slate-950/70 p-2 rounded-lg border border-slate-800/60 leading-relaxed">${escapeHtml(s.memo)}</div>` : ''}
 
-            <!-- アクションバー（試聴・歌った記録・歌詞・YouTube） -->
+            <!-- アクションバー -->
             <div class="flex items-center justify-between pt-1 gap-2 border-t border-slate-800/50 text-[11px]">
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-1.5">
                 <button onclick="recordSung('${s.id}')" class="text-indigo-400 hover:text-indigo-300 bg-indigo-950/50 hover:bg-indigo-950 border border-indigo-900/60 px-2 py-0.5 rounded-md font-medium transition">
                   🎤 歌った！
                 </button>
-                <span class="text-slate-500">${formatDate(s.lastSungAt)}</span>
+                ${hasUndo ? `
+                  <button onclick="undoSung('${s.id}')" class="text-amber-400 hover:text-amber-300 bg-amber-950/60 border border-amber-800/80 px-1.5 py-0.5 rounded-md font-medium text-[10px]">
+                    ↩ 取消
+                  </button>
+                ` : ''}
+                <button onclick="${inSetlist ? `removeFromSetlist('${s.id}')` : `addToSetlist('${s.id}')`}" class="text-[10px] px-2 py-0.5 rounded-md font-medium border transition ${inSetlist ? 'bg-indigo-900/80 border-indigo-600 text-indigo-200' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}">
+                  ${inSetlist ? '✓ セトリ中' : '＋ セトリ'}
+                </button>
               </div>
               <div class="flex items-center gap-2">
                 ${s.previewUrl ? `
@@ -495,8 +660,31 @@
 
     window.recordSung = async function(id) {
       if (!window.firestoreOps) return;
+      const target = (window.songs || []).find(s => s.id === id);
+      if (!target) return;
+
+      undoHistory[id] = target.lastSungAt || null;
+      render();
+
       const { doc, updateDoc } = window.firestoreOps;
       await updateDoc(doc(window.db, "songs", id), { lastSungAt: Date.now() });
+
+      setTimeout(() => {
+        if (undoHistory[id] !== undefined) {
+          delete undoHistory[id];
+          render();
+        }
+      }, 10000);
+    };
+
+    window.undoSung = async function(id) {
+      if (!window.firestoreOps || undoHistory[id] === undefined) return;
+      const prevVal = undoHistory[id];
+      delete undoHistory[id];
+      render();
+
+      const { doc, updateDoc } = window.firestoreOps;
+      await updateDoc(doc(window.db, "songs", id), { lastSungAt: prevVal });
     };
 
     window.openModal = function() {
@@ -506,15 +694,19 @@
       document.getElementById('formArtist').value = '';
       document.getElementById('formYear').value = '';
       document.getElementById('formGenre').value = '';
+      document.getElementById('formMaxPitch').value = '';
+      document.getElementById('formMinPitch').value = '';
       document.getElementById('formArtwork').value = '';
       document.getElementById('formPreviewUrl').value = '';
       document.getElementById('formDuration').value = '';
+      document.getElementById('formLastSungAt').value = '';
       document.getElementById('formKey').value = '0';
       document.getElementById('formScore').value = '歌える';
       document.getElementById('formTags').value = '';
       document.getElementById('formMemo').value = '';
       document.getElementById('apiSearchInput').value = '';
       document.getElementById('apiSearchResults').classList.add('hidden');
+      document.getElementById('resetSungRow').classList.add('hidden');
       document.getElementById('modal').classList.remove('hidden');
     };
 
@@ -527,15 +719,33 @@
       document.getElementById('formArtist').value = s.artist || '';
       document.getElementById('formYear').value = s.year || '';
       document.getElementById('formGenre').value = s.genre || '';
+      document.getElementById('formMaxPitch').value = s.maxPitch || '';
+      document.getElementById('formMinPitch').value = s.minPitch || '';
       document.getElementById('formArtwork').value = s.artwork || '';
       document.getElementById('formPreviewUrl').value = s.previewUrl || '';
       document.getElementById('formDuration').value = s.duration || '';
+      document.getElementById('formLastSungAt').value = s.lastSungAt || '';
       document.getElementById('formKey').value = s.key || '0';
       document.getElementById('formScore').value = s.score || '歌える';
       document.getElementById('formTags').value = (s.tags || []).join(', ');
       document.getElementById('formMemo').value = s.memo || '';
       document.getElementById('apiSearchResults').classList.add('hidden');
+      
+      const resetRow = document.getElementById('resetSungRow');
+      if (s.lastSungAt) {
+        resetRow.classList.remove('hidden');
+      } else {
+        resetRow.classList.add('hidden');
+      }
+
       document.getElementById('modal').classList.remove('hidden');
+    };
+
+    window.clearSungHistory = function() {
+      if (confirm('この曲の歌唱履歴を未歌唱に戻しますか？')) {
+        document.getElementById('formLastSungAt').value = '';
+        document.getElementById('resetSungRow').classList.add('hidden');
+      }
     };
 
     window.closeModal = function() {
@@ -559,6 +769,8 @@
         artist: document.getElementById('formArtist').value,
         year: document.getElementById('formYear').value,
         genre: document.getElementById('formGenre').value,
+        maxPitch: document.getElementById('formMaxPitch').value.trim(),
+        minPitch: document.getElementById('formMinPitch').value.trim(),
         artwork: document.getElementById('formArtwork').value,
         previewUrl: document.getElementById('formPreviewUrl').value,
         duration: document.getElementById('formDuration').value,
@@ -566,6 +778,7 @@
         score: document.getElementById('formScore').value,
         tags: tags,
         memo: document.getElementById('formMemo').value,
+        lastSungAt: document.getElementById('formLastSungAt').value ? Number(document.getElementById('formLastSungAt').value) : null
       };
 
       const { collection, addDoc, doc, updateDoc } = window.firestoreOps;
@@ -585,6 +798,7 @@
     window.deleteSong = async function(id) {
       if (confirm('この曲を削除しますか？')) {
         if (!window.firestoreOps) return;
+        removeFromSetlist(id);
         const { doc, deleteDoc } = window.firestoreOps;
         await deleteDoc(doc(window.db, "songs", id));
       }
@@ -602,7 +816,7 @@
       const pick = pool[Math.floor(Math.random() * pool.length)];
       document.getElementById('randomTitle').textContent = pick.title;
       document.getElementById('randomArtist').textContent = pick.artist || '歌手未設定';
-      document.getElementById('randomMeta').textContent = `${pick.year ? pick.year + '年 • ' : ''}${pick.genre || ''}`;
+      document.getElementById('randomMeta').textContent = `${pick.year ? pick.year + '年 • ' : ''}${pick.genre || ''}${pick.maxPitch ? ' • 最高 ' + pick.maxPitch : ''}`;
       document.getElementById('randomKey').textContent = 'キー: ' + (pick.key === '0' ? '原曲キー' : pick.key);
       document.getElementById('randomBanner').classList.remove('hidden');
     };
