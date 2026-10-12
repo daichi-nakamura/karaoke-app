@@ -48,7 +48,6 @@ function fetchITunesApi(term, limit = 1) {
   const apiUrl = `https://itunes.apple.com/search?term=${cleanTerm}&country=jp&entity=song&limit=${limit}`;
 
   return new Promise((resolve, reject) => {
-    // 1. 通常fetch試行
     fetch(apiUrl)
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -56,7 +55,6 @@ function fetchITunesApi(term, limit = 1) {
       })
       .then(data => resolve(data))
       .catch(() => {
-        // 2. fetchがブロックされた場合のJSONPフォールバック
         const cbName = 'itunes_jsonp_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
         const script = document.createElement('script');
         script.src = `${apiUrl}&callback=${cbName}`;
@@ -187,7 +185,8 @@ window.processBulkSearch = async function() {
           duetType: isDuet ? 'duet' : 'solo',
           tags: tags,
           isAlreadyAdded: isAlreadyAdded,
-          isEditing: false
+          isEditing: false,
+          reSearchResults: []
         });
       } else {
         bulkCandidateSongs.push({
@@ -206,7 +205,8 @@ window.processBulkSearch = async function() {
           tags: [],
           isAlreadyAdded: false,
           notFound: true,
-          isEditing: false
+          isEditing: false,
+          reSearchResults: []
         });
       }
     } catch (err) {
@@ -271,11 +271,11 @@ function renderBulkPreview() {
           <div class="grid grid-cols-2 gap-1.5">
             <div>
               <label class="block text-[9px] text-slate-400 mb-0.5">曲名</label>
-              <input type="text" value="${escapeHtml(s.title)}" onchange="updateBulkCandidateField(${idx}, 'title', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-white">
+              <input type="text" id="editTitle_${idx}" value="${escapeHtml(s.title)}" onchange="updateBulkCandidateField(${idx}, 'title', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-white">
             </div>
             <div>
               <label class="block text-[9px] text-slate-400 mb-0.5">歌手名</label>
-              <input type="text" value="${escapeHtml(s.artist)}" onchange="updateBulkCandidateField(${idx}, 'artist', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-white">
+              <input type="text" id="editArtist_${idx}" value="${escapeHtml(s.artist)}" onchange="updateBulkCandidateField(${idx}, 'artist', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-white">
             </div>
           </div>
           <div class="grid grid-cols-4 gap-1.5">
@@ -302,14 +302,35 @@ function renderBulkPreview() {
             </div>
             <div>
               <label class="block text-[9px] text-slate-400 mb-0.5">年</label>
-              <input type="text" value="${escapeHtml(s.year || '')}" onchange="updateBulkCandidateField(${idx}, 'year', this.value)" placeholder="2020" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-white">
+              <input type="text" id="editYear_${idx}" value="${escapeHtml(s.year || '')}" onchange="updateBulkCandidateField(${idx}, 'year', this.value)" placeholder="2020" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-white">
             </div>
           </div>
-          <div class="pt-1 border-t border-slate-800">
-            <div class="text-[9px] text-indigo-400 font-semibold mb-1">🔍 iTunesから再検索して差し替え</div>
+
+          <div class="pt-1.5 border-t border-slate-800">
+            <div class="text-[9px] text-indigo-400 font-semibold mb-1">🔍 iTunesから再検索して選択差し替え</div>
             <div class="flex gap-1">
-              <input type="text" id="reSearchInput_${idx}" placeholder="再検索キーワード..." value="${escapeHtml((s.title || '') + ' ' + (s.artist || ''))}" class="flex-1 bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[10px] text-white">
-              <button type="button" onclick="reSearchSingleBulkCandidate(${idx})" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded text-[10px] whitespace-nowrap">再取得</button>
+              <input type="text" id="reSearchInput_${idx}" onkeydown="if(event.key==='Enter'){event.preventDefault(); reSearchSingleBulkCandidate(${idx});}" placeholder="歌手名や曲名を入力..." value="${escapeHtml((s.title || '') + ' ' + (s.artist || ''))}" class="flex-1 bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[10px] text-white focus:outline-none focus:border-indigo-500">
+              <button type="button" onclick="reSearchSingleBulkCandidate(${idx})" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded text-[10px] font-semibold whitespace-nowrap">再検索</button>
+            </div>
+
+            <!-- 単曲検索と同じ選択リストを展開 -->
+            <div id="reSearchResults_${idx}" class="mt-1.5 max-h-44 overflow-y-auto no-scrollbar space-y-1 ${s.reSearchResults && s.reSearchResults.length > 0 ? '' : 'hidden'}">
+              ${(s.reSearchResults || []).map(item => {
+                const raw = encodeURIComponent(JSON.stringify(item));
+                return `
+                  <div onclick="applyITunesSongToCandidate(${idx}, '${raw}')" class="flex items-center gap-2 p-1.5 bg-slate-950 hover:bg-indigo-950/40 border border-slate-800 hover:border-indigo-600/60 rounded-lg cursor-pointer transition">
+                    ${item.artwork ? `<img src="${item.artwork}" class="w-8 h-8 rounded object-cover shrink-0 bg-slate-800">` : `<div class="w-8 h-8 rounded bg-slate-800 flex items-center justify-center text-[10px] text-slate-500 shrink-0">🎵</div>`}
+                    <div class="min-w-0 flex-1 text-[10px]">
+                      <div class="font-bold text-white truncate flex items-center gap-1">
+                        <span>${escapeHtml(item.title)}</span>
+                        ${item.isDuet ? '<span class="text-[8px] bg-purple-950 text-purple-300 px-1 rounded">デュエット</span>' : ''}
+                      </div>
+                      <div class="text-slate-400 truncate text-[9px]">${escapeHtml(item.artist)} • ${item.year || '年不明'} • ${escapeHtml(item.genre)}</div>
+                    </div>
+                    <span class="text-[9px] text-indigo-400 border border-indigo-700/60 bg-indigo-950/60 px-1.5 py-0.5 rounded font-bold shrink-0">選択</span>
+                  </div>
+                `;
+              }).join('')}
             </div>
           </div>
         </div>
@@ -320,6 +341,9 @@ function renderBulkPreview() {
 
 window.toggleEditBulkCandidate = function(idx) {
   bulkCandidateSongs[idx].isEditing = !bulkCandidateSongs[idx].isEditing;
+  if (!bulkCandidateSongs[idx].isEditing) {
+    bulkCandidateSongs[idx].reSearchResults = [];
+  }
   renderBulkPreview();
 };
 
@@ -333,42 +357,73 @@ window.updateBulkCandidateField = function(idx, field, val) {
   }
 };
 
+// 一括登録用の単曲検索と同じ候補取得
 window.reSearchSingleBulkCandidate = async function(idx) {
   const inputEl = document.getElementById(`reSearchInput_${idx}`);
   const term = inputEl ? inputEl.value.trim() : '';
   if (!term) return alert("検索キーワードを入力してください。");
 
+  const resultsBox = document.getElementById(`reSearchResults_${idx}`);
+  if (resultsBox) {
+    resultsBox.classList.remove('hidden');
+    resultsBox.innerHTML = '<div class="text-[10px] text-slate-400 py-1.5 text-center">iTunesで候補を検索中...</div>';
+  }
+
   try {
-    const data = await fetchITunesApi(term, 1);
-    if (data.results && data.results.length > 0) {
-      const item = data.results[0];
+    const data = await fetchITunesApi(term, 25);
+    if (!data.results || data.results.length === 0) {
+      if (resultsBox) resultsBox.innerHTML = '<div class="text-[10px] text-slate-500 py-1.5 text-center">曲が見つかりませんでした</div>';
+      return;
+    }
+
+    bulkCandidateSongs[idx].reSearchResults = data.results.map(item => {
       const year = item.releaseDate ? item.releaseDate.substring(0, 4) : '';
       const mins = Math.floor((item.trackTimeMillis || 0) / 60000);
       const secs = Math.floor(((item.trackTimeMillis || 0) % 60000) / 1000).toString().padStart(2, '0');
       const isDuet = checkIsDuet(item.trackName, item.artistName);
 
-      const existingSet = new Set((window.songs || []).map(s => `${(s.title || '').toLowerCase()}_${(s.artist || '').toLowerCase()}`));
-      const isAlreadyAdded = existingSet.has(`${item.trackName.toLowerCase()}_${item.artistName.toLowerCase()}`);
+      return {
+        title: item.trackName,
+        artist: item.artistName,
+        year: year,
+        genre: item.primaryGenreName || 'J-Pop',
+        artwork: item.artworkUrl100 || '',
+        previewUrl: item.previewUrl || '',
+        duration: item.trackTimeMillis ? `${mins}:${secs}` : '',
+        durationMs: item.trackTimeMillis || 0,
+        isDuet: isDuet
+      };
+    });
 
-      bulkCandidateSongs[idx].title = item.trackName;
-      bulkCandidateSongs[idx].artist = item.artistName;
-      bulkCandidateSongs[idx].year = year;
-      bulkCandidateSongs[idx].genre = item.primaryGenreName || 'J-Pop';
-      bulkCandidateSongs[idx].artwork = item.artworkUrl100 || '';
-      bulkCandidateSongs[idx].previewUrl = item.previewUrl || '';
-      bulkCandidateSongs[idx].duration = item.trackTimeMillis ? `${mins}:${secs}` : '';
-      bulkCandidateSongs[idx].durationMs = item.trackTimeMillis || 0;
-      bulkCandidateSongs[idx].duetType = isDuet ? 'duet' : 'solo';
-      bulkCandidateSongs[idx].isAlreadyAdded = isAlreadyAdded;
-      bulkCandidateSongs[idx].notFound = false;
-      bulkCandidateSongs[idx].isEditing = false;
-      renderBulkPreview();
-    } else {
-      alert("該当する曲が見つかりませんでした。別のキーワードでお試しください。");
-    }
+    renderBulkPreview();
   } catch (e) {
-    alert("検索エラー: " + e.message);
+    if (resultsBox) resultsBox.innerHTML = `<div class="text-[10px] text-rose-400 py-1.5 text-center">検索エラー: ${e.message}</div>`;
   }
+};
+
+// 候補一覧から曲をタップして反映（編集画面は開いたまま維持）
+window.applyITunesSongToCandidate = function(idx, encoded) {
+  const item = JSON.parse(decodeURIComponent(encoded));
+  if (!bulkCandidateSongs[idx]) return;
+
+  const existingSet = new Set((window.songs || []).map(s => `${(s.title || '').toLowerCase()}_${(s.artist || '').toLowerCase()}`));
+  const isAlreadyAdded = existingSet.has(`${item.title.toLowerCase()}_${item.artist.toLowerCase()}`);
+
+  bulkCandidateSongs[idx].title = item.title;
+  bulkCandidateSongs[idx].artist = item.artist;
+  bulkCandidateSongs[idx].year = item.year;
+  bulkCandidateSongs[idx].genre = item.genre;
+  bulkCandidateSongs[idx].artwork = item.artwork;
+  bulkCandidateSongs[idx].previewUrl = item.previewUrl;
+  bulkCandidateSongs[idx].duration = item.duration;
+  bulkCandidateSongs[idx].durationMs = item.durationMs;
+  bulkCandidateSongs[idx].duetType = item.isDuet ? 'duet' : 'solo';
+  bulkCandidateSongs[idx].isAlreadyAdded = isAlreadyAdded;
+  bulkCandidateSongs[idx].notFound = false;
+  bulkCandidateSongs[idx].reSearchResults = []; // リストを閉じる
+  // isEditingはtrueのまま維持してユーザーが確認・微調整できるようにする
+
+  renderBulkPreview();
 };
 
 window.removeBulkCandidate = function(idx) {
@@ -531,6 +586,7 @@ window.switchMainTab = function(tab) {
     { id: 'ranking', btn: document.getElementById('navTabRanking'), view: document.getElementById('viewRanking') }
   ];
   tabs.forEach(t => {
+    if (!t.btn || !t.view) return;
     if (t.id === tab) {
       t.btn.className = "py-1.5 rounded-lg font-bold transition bg-indigo-600 text-white shadow text-center truncate";
       t.view.classList.remove('hidden');
@@ -1249,8 +1305,8 @@ window.setScoreFilter = function(score) {
   selectedScore = score;
   document.querySelectorAll('.score-tab').forEach(b => {
     b.className = b.dataset.val === score 
-      ? 'score-tab px-2 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0' 
-      : 'score-tab px-2 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0';
+      ? 'score-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0' 
+      : 'score-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0';
   });
   render();
 };
