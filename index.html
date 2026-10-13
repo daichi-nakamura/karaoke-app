@@ -189,7 +189,7 @@
     </div>
   </main>
 
-  <!-- ピックアップ（旧セットリスト）管理ドロワー -->
+  <!-- ピックアップ管理ドロワー -->
   <div id="setlistDrawer" class="fixed inset-x-0 bottom-0 z-40 bg-slate-900/98 backdrop-blur border-t border-slate-800 p-4 transform translate-y-full transition-transform duration-300 max-w-md mx-auto rounded-t-2xl shadow-2xl space-y-3">
     <div class="flex justify-between items-center border-b border-slate-800 pb-2">
       <div>
@@ -278,7 +278,7 @@
       <!-- パネルA: 単曲登録フォーム -->
       <div id="modalPanelSingle" class="space-y-3 overflow-y-auto no-scrollbar flex-1">
         <div class="bg-slate-950 border border-slate-800 p-2.5 rounded-xl space-y-2">
-          <div class="text-[11px] font-bold text-indigo-400">⚡ iTunesで検索（歌手・曲名から最大200件）</div>
+          <div class="text-[11px] font-bold text-indigo-400">⚡ iTunesで検索（歌手・曲名から検索）</div>
           <div class="flex gap-1.5">
             <input type="text" id="apiSearchInput" onkeydown="if(event.key==='Enter'){event.preventDefault();searchITunes();}" placeholder="歌手名や曲名を入力..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-slate-600 focus:outline-none">
             <button type="button" onclick="searchITunes()" class="bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap">検索</button>
@@ -432,7 +432,15 @@
         <div id="bulkPreviewArea" class="hidden space-y-2 pt-1 flex-1 flex flex-col min-h-0">
           <div class="flex justify-between items-center text-[11px] text-slate-400 px-0.5 shrink-0">
             <span id="bulkFoundCount">0件取得</span>
-            <span class="text-[10px] text-slate-500">バッジタップで完成度変更</span>
+            <div class="flex items-center gap-1.5">
+              <span class="text-[10px] text-slate-500">一括完成度:</span>
+              <select onchange="bulkSetAllScore(this.value)" class="bg-slate-950 border border-slate-800 text-slate-300 text-[10px] rounded px-1.5 py-0.5 focus:outline-none">
+                <option value="keep">変更なし</option>
+                <option value="練習中">全件: 練習中</option>
+                <option value="歌える">全件: 歌える</option>
+                <option value="得意">全件: 得意</option>
+              </select>
+            </div>
           </div>
 
           <div id="bulkPreviewList" class="overflow-y-auto no-scrollbar space-y-2 flex-1 max-h-[60vh] pr-0.5"></div>
