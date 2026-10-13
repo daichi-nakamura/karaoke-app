@@ -13,7 +13,7 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen pb-32 font-sans select-none">
 
-  <!-- ヘッダー（デザイン・アイコン刷新 & 折り返し防止） -->
+  <!-- ヘッダー -->
   <header class="sticky top-0 z-20 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-3.5 py-2 space-y-2">
     <div class="max-w-md mx-auto flex items-center justify-between gap-2">
       <div class="flex items-center gap-2 min-w-0">
@@ -28,7 +28,7 @@
       </div>
       <div class="flex items-center gap-1.5 shrink-0">
         <button onclick="toggleSetlistDrawer()" class="relative bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 whitespace-nowrap shadow-sm">
-          <span>📋 セトリ</span>
+          <span>⭐ ピックアップ</span>
           <span id="setlistBadge" class="hidden bg-indigo-500 text-white rounded-full px-1.5 py-0.2 text-[10px] font-mono">0</span>
         </button>
         <button onclick="openModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1.5 rounded-xl text-xs font-bold shadow flex items-center gap-0.5 transition whitespace-nowrap">
@@ -58,7 +58,7 @@
   <main id="viewMyList" class="max-w-md mx-auto p-4 space-y-2.5">
     <div id="statusBanner" class="hidden text-xs p-2.5 rounded-xl border"></div>
 
-    <!-- 検索バー（凡例短縮で文字収容） -->
+    <!-- 検索バー -->
     <div class="flex gap-2">
       <input type="text" id="searchInput" oninput="render()" placeholder="曲名・歌手・タグ・音域等で検索..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm placeholder:text-slate-500 text-slate-100 focus:outline-none focus:border-indigo-500">
       <button onclick="pickRandom()" class="bg-slate-900 border border-slate-800 px-3.5 py-2.5 rounded-xl text-lg hover:bg-slate-800 transition shrink-0" title="ランダム選曲">🎲</button>
@@ -66,13 +66,15 @@
 
     <!-- フィルターエリア -->
     <div class="space-y-1.5">
-      <!-- 1. 年代別 -->
+      <!-- 1. 年代別（10年刻み細分化） -->
       <div class="flex gap-1 overflow-x-auto no-scrollbar text-xs" id="decadeTabs">
         <button onclick="setDecadeFilter('all')" class="decade-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0" data-val="all">全年代</button>
         <button onclick="setDecadeFilter('2020s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="2020s">2020年代</button>
         <button onclick="setDecadeFilter('2010s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="2010s">2010年代</button>
         <button onclick="setDecadeFilter('2000s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="2000s">2000年代</button>
-        <button onclick="setDecadeFilter('90s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="90s">90年代以前</button>
+        <button onclick="setDecadeFilter('1990s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="1990s">1990年代</button>
+        <button onclick="setDecadeFilter('1980s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="1980s">1980年代</button>
+        <button onclick="setDecadeFilter('1970s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="1970s">1970年代以前</button>
       </div>
 
       <!-- 2. キー属性 & デュエット -->
@@ -84,10 +86,10 @@
         <button onclick="setAttrFilter('duet')" class="attr-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="duet">👥 デュエット</button>
       </div>
 
-      <!-- 3. ジャンル別（ラベル削除でフラット化） -->
+      <!-- 3. ジャンル別 -->
       <div id="genreFilterList" class="flex gap-1 overflow-x-auto no-scrollbar text-xs"></div>
 
-      <!-- 4. 完成度フィルター（ジャンルとタグの間に配置） -->
+      <!-- 4. 完成度フィルター -->
       <div class="flex gap-1 overflow-x-auto no-scrollbar py-0.5 text-xs" id="scoreTabs">
         <button onclick="setScoreFilter('all')" class="score-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0" data-val="all">すべて</button>
         <button onclick="setScoreFilter('得意')" class="score-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="得意">得意</button>
@@ -114,7 +116,7 @@
       </div>
     </div>
 
-    <!-- 左端に並び指定、右端に全展開アイコン→登録曲数の1列バー -->
+    <!-- ソート・全展開・カウント -->
     <div class="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/80">
       <div class="flex items-center gap-1.5 shrink-0">
         <span class="text-[10px] text-slate-400 shrink-0">並び:</span>
@@ -187,17 +189,18 @@
     </div>
   </main>
 
-  <!-- セットリスト管理ドロワー -->
+  <!-- ピックアップ（旧セットリスト）管理ドロワー -->
   <div id="setlistDrawer" class="fixed inset-x-0 bottom-0 z-40 bg-slate-900/98 backdrop-blur border-t border-slate-800 p-4 transform translate-y-full transition-transform duration-300 max-w-md mx-auto rounded-t-2xl shadow-2xl space-y-3">
     <div class="flex justify-between items-center border-b border-slate-800 pb-2">
       <div>
         <div class="flex items-center gap-1.5">
-          <span class="text-base">📋</span>
-          <h3 class="font-bold text-sm text-white">本日のセットリスト</h3>
+          <span class="text-base">⭐</span>
+          <h3 class="font-bold text-sm text-white">本日のピックアップ</h3>
         </div>
         <div id="setlistSummary" class="text-[11px] text-indigo-400 font-mono mt-0.5">0曲 • 合計 0分00秒</div>
       </div>
       <div class="flex items-center gap-2">
+        <button id="btnCopySetlist" onclick="copySetlistToClipboard()" class="text-[11px] text-indigo-300 hover:text-white bg-slate-800 border border-slate-700 px-2 py-0.5 rounded-md transition whitespace-nowrap">📋 コピー</button>
         <button onclick="clearSetlist()" class="text-[11px] text-slate-400 hover:text-rose-400 whitespace-nowrap">全クリア</button>
         <button onclick="toggleSetlistDrawer()" class="text-slate-400 text-sm p-1">✕</button>
       </div>
@@ -256,7 +259,7 @@
     </div>
   </div>
 
-  <!-- 追加・編集モーダル（画面高さをフルに活かせる max-h-[90vh] に拡張） -->
+  <!-- 追加・編集モーダル -->
   <div id="modal" class="fixed inset-0 z-50 bg-black/80 hidden flex items-center justify-center p-3 overflow-y-auto">
     <div class="bg-slate-900 border border-slate-800 w-full max-w-md max-h-[92vh] flex flex-col rounded-2xl p-4 shadow-2xl my-auto space-y-3">
       
@@ -275,9 +278,9 @@
       <!-- パネルA: 単曲登録フォーム -->
       <div id="modalPanelSingle" class="space-y-3 overflow-y-auto no-scrollbar flex-1">
         <div class="bg-slate-950 border border-slate-800 p-2.5 rounded-xl space-y-2">
-          <div class="text-[11px] font-bold text-indigo-400">⚡ iTunesで検索（歌手・曲名から最大50曲）</div>
+          <div class="text-[11px] font-bold text-indigo-400">⚡ iTunesで検索（歌手・曲名から最大200件）</div>
           <div class="flex gap-1.5">
-            <input type="text" id="apiSearchInput" placeholder="歌手名や曲名を入力..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-slate-600 focus:outline-none">
+            <input type="text" id="apiSearchInput" onkeydown="if(event.key==='Enter'){event.preventDefault();searchITunes();}" placeholder="歌手名や曲名を入力..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-slate-600 focus:outline-none">
             <button type="button" onclick="searchITunes()" class="bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap">検索</button>
           </div>
           
@@ -402,7 +405,7 @@
         </form>
       </div>
 
-      <!-- パネルB: まとめて一括登録（縦領域を大幅拡張） -->
+      <!-- パネルB: まとめて一括登録 -->
       <div id="modalPanelBulk" class="space-y-3 overflow-y-auto no-scrollbar flex-1 flex flex-col min-h-0">
         <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 text-[11px] text-slate-400 space-y-1 shrink-0">
           <div class="text-indigo-400 font-bold">📋 曲名リストを貼り付けて一括取得</div>
@@ -425,7 +428,7 @@
 
         <div id="bulkProgress" class="text-[11px] text-indigo-300 hidden text-center py-1 shrink-0"></div>
 
-        <!-- プレビュー枠: 高さを大きく取れるよう flex-1 + max-h-[60vh] に拡張 -->
+        <!-- プレビュー枠 -->
         <div id="bulkPreviewArea" class="hidden space-y-2 pt-1 flex-1 flex flex-col min-h-0">
           <div class="flex justify-between items-center text-[11px] text-slate-400 px-0.5 shrink-0">
             <span id="bulkFoundCount">0件取得</span>
@@ -443,6 +446,37 @@
         </div>
       </div>
 
+    </div>
+  </div>
+
+  <!-- アーティストディスコグラフィ全件モーダル -->
+  <div id="artistModal" class="fixed inset-0 z-50 bg-black/80 hidden flex items-center justify-center p-3 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-md max-h-[92vh] flex flex-col rounded-2xl p-4 shadow-2xl my-auto space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2.5 shrink-0">
+        <div class="min-w-0 pr-2">
+          <div class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">iTunes ディスコグラフィ</div>
+          <h2 id="artistModalName" class="text-base font-extrabold text-white truncate">歌手名</h2>
+        </div>
+        <button onclick="closeArtistModal()" class="text-slate-400 hover:text-white text-sm p-1 shrink-0">✕</button>
+      </div>
+
+      <div class="flex items-center justify-between text-[11px] text-slate-400 shrink-0">
+        <span id="artistModalCount">楽曲を読込中...</span>
+        <div class="flex items-center gap-1">
+          <span>並び順:</span>
+          <select id="artistSortSelect" onchange="renderArtistDiscography()" class="bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5 text-slate-200 text-[10px] focus:outline-none">
+            <option value="yearDesc">リリース年が新しい順</option>
+            <option value="yearAsc">リリース年が古い順</option>
+            <option value="title">曲名順 (あいうえお)</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="artistSongsList" class="flex-1 overflow-y-auto no-scrollbar space-y-2 min-h-0 pr-0.5"></div>
+
+      <button type="button" onclick="closeArtistModal()" class="w-full bg-slate-800 text-slate-300 py-2 rounded-lg text-xs font-bold shrink-0">
+        閉じる
+      </button>
     </div>
   </div>
 
