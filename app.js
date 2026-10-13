@@ -43,17 +43,21 @@ const TIE_UP_PRESETS = [
   { title: 'ミュージック・アワー', artist: 'ポルノグラフィティ', year: '2000', tieUp: '🥤 ポカリスエットCMソング' }
 ];
 
-// 文字列正規化・表記揺れ対策
+// 検索ワードの正規化（全角英数記号の正規化、余計な記号の置換）
 function normalizeSearchTerm(str) {
   if (!str) return '';
-  return str.normalize('NFKC').replace(/\s+/g, ' ').trim();
+  return str
+    .normalize('NFKC')
+    .replace(/[,，、/／]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
-function fetchITunesApi(term, limit = 50, attribute = '') {
+// 安定したiTunes API通信（パラメータ最適化・強固なJSONPフォールバック）
+function fetchITunesApi(term, limit = 50) {
   const normalized = normalizeSearchTerm(term);
   const cleanTerm = encodeURIComponent(normalized);
-  let apiUrl = `https://itunes.apple.com/search?term=${cleanTerm}&country=jp&entity=song&limit=${limit}`;
-  if (attribute) apiUrl += `&attribute=${attribute}`;
+  const apiUrl = `https://itunes.apple.com/search?term=${cleanTerm}&country=jp&entity=song&limit=${limit}`;
 
   return new Promise((resolve, reject) => {
     fetch(apiUrl)
@@ -63,29 +67,39 @@ function fetchITunesApi(term, limit = 50, attribute = '') {
       })
       .then(data => resolve(data))
       .catch(() => {
-        const cbName = 'itunes_jsonp_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+        const cbName = 'itunes_cb_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
         const script = document.createElement('script');
         script.src = `${apiUrl}&callback=${cbName}`;
 
+        let isHandled = false;
         const timer = setTimeout(() => {
-          cleanup();
-          reject(new Error("通信がタイムアウトしました。"));
-        }, 12000);
+          if (!isHandled) {
+            isHandled = true;
+            cleanup();
+            reject(new Error("通信がタイムアウトしました。"));
+          }
+        }, 10000);
 
         function cleanup() {
           clearTimeout(timer);
-          delete window[cbName];
+          try { delete window[cbName]; } catch (e) { window[cbName] = undefined; }
           if (script.parentNode) script.parentNode.removeChild(script);
         }
 
         window[cbName] = (data) => {
-          cleanup();
-          resolve(data);
+          if (!isHandled) {
+            isHandled = true;
+            cleanup();
+            resolve(data);
+          }
         };
 
         script.onerror = () => {
-          cleanup();
-          reject(new Error("iTunesサーバーに接続できませんでした。"));
+          if (!isHandled) {
+            isHandled = true;
+            cleanup();
+            reject(new Error("iTunesサーバーに接続できませんでした。"));
+          }
         };
 
         document.head.appendChild(script);
@@ -159,6 +173,12 @@ window.cycleCandidateScore = function(idx) {
   renderBulkPreview();
 };
 
+window.bulkSetAllScore = function(score) {
+  if (score === 'keep') return;
+  bulkCandidateSongs.forEach(s => { s.score = score; });
+  renderBulkPreview();
+};
+
 window.processBulkSearch = async function() {
   const rawText = document.getElementById('bulkTextInput').value.trim();
   if (!rawText) return alert("曲名を入力または貼り付けてください。");
@@ -184,11 +204,7 @@ window.processBulkSearch = async function() {
     progressEl.textContent = `⏳ iTunesで検索中 (${i + 1}/${rawLines.length}): ${cleanedTerm}`;
 
     try {
-      let data = await fetchITunesApi(cleanedTerm, 3);
-      if ((!data.results || data.results.length === 0) && cleanedTerm.includes(' ')) {
-        const parts = cleanedTerm.split(/\s+/);
-        data = await fetchITunesApi(parts[0], 3);
-      }
+      const data = await fetchITunesApi(cleanedTerm, 1);
 
       if (data.results && data.results.length > 0) {
         const item = data.results[0];
@@ -204,6 +220,7 @@ window.processBulkSearch = async function() {
         const isAlreadyAdded = existingSet.has(`${item.trackName.toLowerCase()}_${item.artistName.toLowerCase()}`);
 
         bulkCandidateSongs.push({
+          id: `bulk_${i}`,
           originalQuery: rawLine,
           title: item.trackName,
           artist: item.artistName,
@@ -224,6 +241,7 @@ window.processBulkSearch = async function() {
         });
       } else {
         bulkCandidateSongs.push({
+          id: `bulk_${i}`,
           originalQuery: rawLine,
           title: cleanedTerm,
           artist: '',
@@ -267,110 +285,122 @@ function renderBulkPreview() {
   btnSave.textContent = `${validCount}曲を一括登録する`;
   btnSave.disabled = validCount === 0;
 
-  container.innerHTML = bulkCandidateSongs.map((s, idx) => `
-    <div class="p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs space-y-1.5 shadow-sm">
-      <div class="flex items-center justify-between text-[10px] text-slate-400 border-b border-slate-900 pb-1">
-        <span class="truncate flex items-center gap-1">
-          <span class="text-indigo-400 font-semibold">🔍 入力:</span>
-          <span class="text-slate-300 font-mono bg-slate-900 px-1.5 py-0.2 rounded border border-slate-800">「${escapeHtml(s.originalQuery)}」</span>
-        </span>
-        <div class="flex items-center gap-1 shrink-0">
-          <button type="button" onclick="toggleEditBulkCandidate(${idx})" class="text-indigo-400 hover:text-indigo-300 px-1 text-xs font-semibold">
-            ${s.isEditing ? '完了' : '✏️ 修正'}
-          </button>
-          <button type="button" onclick="removeBulkCandidate(${idx})" class="text-slate-500 hover:text-rose-400 px-1 text-xs">✕ 除外</button>
-        </div>
-      </div>
+  container.innerHTML = bulkCandidateSongs.map((s, idx) => {
+    const playId = s.id || `bulk_${idx}`;
+    const isPlaying = currentPlayingId === playId;
 
-      <div class="flex items-center gap-2.5">
-        ${s.artwork ? `<img src="${s.artwork}" class="w-10 h-10 rounded-lg object-cover shrink-0 bg-slate-800 border border-slate-800">` : `<div class="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center shrink-0 text-slate-500 text-xs border border-slate-800">🎵</div>`}
-        <div class="min-w-0 flex-1">
-          <div class="font-bold text-white truncate flex items-center gap-1.5">
-            <span>${escapeHtml(s.title)}</span>
-            ${s.key !== '0' ? `<span class="text-[9px] bg-slate-800 text-indigo-300 border border-slate-700 px-1 rounded font-mono">${s.key}</span>` : ''}
-            <button type="button" onclick="cycleCandidateScore(${idx})" title="タップで完成度を変更" class="text-[9px] px-1.5 py-0.2 rounded cursor-pointer transition active:scale-95 ${s.score === '得意' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900' : s.score === '歌える' ? 'bg-sky-950 text-sky-300 border border-sky-800 hover:bg-sky-900' : 'bg-amber-950 text-amber-300 border border-amber-800 hover:bg-amber-900'}">
-              ${s.score} 🔄
+    return `
+      <div class="p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs space-y-1.5 shadow-sm transition ${s.isAlreadyAdded ? 'opacity-60 bg-slate-950/40 border-dashed' : ''}">
+        <div class="flex items-center justify-between text-[10px] text-slate-400 border-b border-slate-900 pb-1">
+          <span class="truncate flex items-center gap-1">
+            <span class="text-indigo-400 font-semibold">🔍 入力:</span>
+            <span class="text-slate-300 font-mono bg-slate-900 px-1.5 py-0.2 rounded border border-slate-800">「${escapeHtml(s.originalQuery)}」</span>
+          </span>
+          <div class="flex items-center gap-1 shrink-0">
+            <button type="button" onclick="toggleEditBulkCandidate(${idx})" class="text-indigo-400 hover:text-indigo-300 px-1 text-xs font-semibold">
+              ${s.isEditing ? '完了' : '✏️ 修正'}
             </button>
-            ${s.duetType === 'duet' ? '<span class="text-[9px] bg-purple-950 text-purple-300 border border-purple-800 px-1 rounded whitespace-nowrap">デュエット</span>' : ''}
-            ${s.isAlreadyAdded ? '<span class="text-[9px] bg-slate-800 text-slate-400 border border-slate-700 px-1 rounded whitespace-nowrap">登録済</span>' : ''}
-            ${s.notFound ? '<span class="text-[9px] bg-amber-950 text-amber-400 border border-amber-800 px-1 rounded whitespace-nowrap">情報なし</span>' : ''}
-          </div>
-          <div class="text-[10px] text-slate-400 truncate mt-0.5">
-            ${escapeHtml(s.artist) || '歌手未設定'} ${s.year ? '• ' + s.year + '年' : ''} ${s.genre ? '• ' + escapeHtml(s.genre) : ''}
+            <button type="button" onclick="removeBulkCandidate(${idx})" class="text-slate-500 hover:text-rose-400 px-1 text-xs">✕ 除外</button>
           </div>
         </div>
-      </div>
 
-      ${s.isEditing ? `
-        <div class="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800 space-y-2 mt-1.5">
-          <div class="grid grid-cols-2 gap-1.5">
-            <div>
-              <label class="block text-[9px] text-slate-400 mb-0.5">曲名</label>
-              <input type="text" id="editTitle_${idx}" value="${escapeHtml(s.title)}" onchange="updateBulkCandidateField(${idx}, 'title', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-white">
-            </div>
-            <div>
-              <label class="block text-[9px] text-slate-400 mb-0.5">歌手名</label>
-              <input type="text" id="editArtist_${idx}" value="${escapeHtml(s.artist)}" onchange="updateBulkCandidateField(${idx}, 'artist', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-white">
-            </div>
-          </div>
-          <div class="grid grid-cols-4 gap-1.5">
-            <div>
-              <label class="block text-[9px] text-slate-400 mb-0.5">キー</label>
-              <select onchange="updateBulkCandidateField(${idx}, 'key', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1 py-1 text-[11px] text-white">
-                ${['-6','-5','-4','-3','-2','-1','0','+1','+2','+3','+4','+5','+6'].map(k => `<option value="${k}" ${s.key === k ? 'selected' : ''}>${k === '0' ? '原曲' : k}</option>`).join('')}
-              </select>
-            </div>
-            <div>
-              <label class="block text-[9px] text-emerald-400 mb-0.5">完成度</label>
-              <select onchange="updateBulkCandidateField(${idx}, 'score', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1 py-1 text-[11px] text-white">
-                <option value="得意" ${s.score === '得意' ? 'selected' : ''}>得意</option>
-                <option value="歌える" ${s.score === '歌える' ? 'selected' : ''}>歌える</option>
-                <option value="練習中" ${s.score === '練習中' ? 'selected' : ''}>練習中</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-[9px] text-slate-400 mb-0.5">タイプ</label>
-              <select onchange="updateBulkCandidateField(${idx}, 'duetType', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1 py-1 text-[11px] text-white">
-                <option value="solo" ${s.duetType === 'solo' ? 'selected' : ''}>ソロ</option>
-                <option value="duet" ${s.duetType === 'duet' ? 'selected' : ''}>デュエット</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-[9px] text-slate-400 mb-0.5">年</label>
-              <input type="text" id="editYear_${idx}" value="${escapeHtml(s.year || '')}" onchange="updateBulkCandidateField(${idx}, 'year', this.value)" placeholder="2020" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-white">
+        <div class="flex items-center gap-2.5">
+          <!-- 30秒試聴オーバーレイ付きジャケット -->
+          <div onclick="togglePlayPreview('${s.previewUrl || ''}', '${playId}', '${escapeHtml(s.title)}', '${escapeHtml(s.artist)}')" class="relative w-11 h-11 rounded-xl overflow-hidden shrink-0 cursor-pointer shadow border border-slate-800 bg-slate-800">
+            ${s.artwork ? `<img src="${s.artwork}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-slate-500 text-xs">🎵</div>`}
+            <div class="absolute inset-0 bg-black/40 flex items-center justify-center transition ${isPlaying ? 'opacity-100 bg-rose-950/70' : 'opacity-0 hover:opacity-100'}">
+              <span class="text-xs text-white">${isPlaying ? '⏹' : '▶'}</span>
             </div>
           </div>
 
-          <div class="pt-1.5 border-t border-slate-800">
-            <div class="text-[9px] text-indigo-400 font-semibold mb-1">🔍 iTunesから再検索して選択差し替え</div>
-            <div class="flex gap-1">
-              <input type="text" id="reSearchInput_${idx}" oninput="updateSearchKeyword(${idx}, this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault(); reSearchSingleBulkCandidate(${idx});}" placeholder="歌手名や曲名を入力..." value="${escapeHtml(s.searchKeyword !== undefined ? s.searchKeyword : ((s.title || '') + ' ' + (s.artist || '')))}" class="flex-1 bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[10px] text-white focus:outline-none focus:border-indigo-500">
-              <button type="button" onclick="reSearchSingleBulkCandidate(${idx})" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded text-[10px] font-semibold whitespace-nowrap">再検索</button>
+          <div class="min-w-0 flex-1">
+            <div class="font-bold text-white truncate flex items-center gap-1.5">
+              <span>${escapeHtml(s.title)}</span>
+              ${s.key !== '0' ? `<span class="text-[9px] bg-slate-800 text-indigo-300 border border-slate-700 px-1 rounded font-mono">${s.key}</span>` : ''}
+              <button type="button" onclick="cycleCandidateScore(${idx})" title="タップで完成度を変更" class="text-[9px] px-1.5 py-0.2 rounded cursor-pointer transition active:scale-95 ${s.score === '得意' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900' : s.score === '歌える' ? 'bg-sky-950 text-sky-300 border border-sky-800 hover:bg-sky-900' : 'bg-amber-950 text-amber-300 border border-amber-800 hover:bg-amber-900'}">
+                ${s.score} 🔄
+              </button>
+              ${s.duetType === 'duet' ? '<span class="text-[9px] bg-purple-950 text-purple-300 border border-purple-800 px-1 rounded whitespace-nowrap">デュエット</span>' : ''}
+              ${s.isAlreadyAdded ? '<span class="text-[9px] bg-slate-800 text-slate-400 border border-slate-700 px-1 rounded whitespace-nowrap">登録済 (スキップ)</span>' : ''}
+              ${s.notFound ? '<span class="text-[9px] bg-amber-950 text-amber-400 border border-amber-800 px-1 rounded whitespace-nowrap">情報なし</span>' : ''}
+            </div>
+            <div class="text-[10px] text-slate-400 truncate mt-0.5">
+              ${escapeHtml(s.artist) || '歌手未設定'} ${s.year ? '• ' + s.year + '年' : ''} ${s.genre ? '• ' + escapeHtml(s.genre) : ''} ${s.duration ? '• ' + s.duration : ''}
+            </div>
+          </div>
+        </div>
+
+        ${s.isEditing ? `
+          <div class="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800 space-y-2 mt-1.5">
+            <div class="grid grid-cols-2 gap-1.5">
+              <div>
+                <label class="block text-[9px] text-slate-400 mb-0.5">曲名</label>
+                <input type="text" id="editTitle_${idx}" value="${escapeHtml(s.title)}" onchange="updateBulkCandidateField(${idx}, 'title', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-white">
+              </div>
+              <div>
+                <label class="block text-[9px] text-slate-400 mb-0.5">歌手名</label>
+                <input type="text" id="editArtist_${idx}" value="${escapeHtml(s.artist)}" onchange="updateBulkCandidateField(${idx}, 'artist', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-white">
+              </div>
+            </div>
+            <div class="grid grid-cols-4 gap-1.5">
+              <div>
+                <label class="block text-[9px] text-slate-400 mb-0.5">キー</label>
+                <select onchange="updateBulkCandidateField(${idx}, 'key', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1 py-1 text-[11px] text-white">
+                  ${['-6','-5','-4','-3','-2','-1','0','+1','+2','+3','+4','+5','+6'].map(k => `<option value="${k}" ${s.key === k ? 'selected' : ''}>${k === '0' ? '原曲' : k}</option>`).join('')}
+                </select>
+              </div>
+              <div>
+                <label class="block text-[9px] text-emerald-400 mb-0.5">完成度</label>
+                <select onchange="updateBulkCandidateField(${idx}, 'score', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1 py-1 text-[11px] text-white">
+                  <option value="得意" ${s.score === '得意' ? 'selected' : ''}>得意</option>
+                  <option value="歌える" ${s.score === '歌える' ? 'selected' : ''}>歌える</option>
+                  <option value="練習中" ${s.score === '練習中' ? 'selected' : ''}>練習中</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[9px] text-slate-400 mb-0.5">タイプ</label>
+                <select onchange="updateBulkCandidateField(${idx}, 'duetType', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1 py-1 text-[11px] text-white">
+                  <option value="solo" ${s.duetType === 'solo' ? 'selected' : ''}>ソロ</option>
+                  <option value="duet" ${s.duetType === 'duet' ? 'selected' : ''}>デュエット</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[9px] text-slate-400 mb-0.5">年</label>
+                <input type="text" id="editYear_${idx}" value="${escapeHtml(s.year || '')}" onchange="updateBulkCandidateField(${idx}, 'year', this.value)" placeholder="2020" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-white">
+              </div>
             </div>
 
-            <div id="reSearchResults_${idx}" class="mt-1.5 max-h-44 overflow-y-auto no-scrollbar space-y-1 ${s.reSearchResults && s.reSearchResults.length > 0 ? '' : 'hidden'}">
-              ${(s.reSearchResults || []).map(item => {
-                const raw = encodeURIComponent(JSON.stringify(item));
-                return `
-                  <div onclick="applyITunesSongToCandidate(${idx}, '${raw}')" class="flex items-center gap-2 p-1.5 bg-slate-950 hover:bg-indigo-950/40 border border-slate-800 hover:border-indigo-600/60 rounded-lg cursor-pointer transition">
-                    ${item.artwork ? `<img src="${item.artwork}" class="w-8 h-8 rounded object-cover shrink-0 bg-slate-800">` : `<div class="w-8 h-8 rounded bg-slate-800 flex items-center justify-center text-[10px] text-slate-500 shrink-0">🎵</div>`}
-                    <div class="min-w-0 flex-1 text-[10px]">
-                      <div class="font-bold text-white truncate flex items-center gap-1">
-                        <span>${escapeHtml(item.title)}</span>
-                        ${item.isDuet ? '<span class="text-[8px] bg-purple-950 text-purple-300 px-1 rounded">デュエット</span>' : ''}
+            <div class="pt-1.5 border-t border-slate-800">
+              <div class="text-[9px] text-indigo-400 font-semibold mb-1">🔍 iTunesから再検索して選択差し替え</div>
+              <div class="flex gap-1">
+                <input type="text" id="reSearchInput_${idx}" oninput="updateSearchKeyword(${idx}, this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault(); reSearchSingleBulkCandidate(${idx});}" placeholder="歌手名や曲名を入力..." value="${escapeHtml(s.searchKeyword !== undefined ? s.searchKeyword : ((s.title || '') + ' ' + (s.artist || '')))}" class="flex-1 bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[10px] text-white focus:outline-none focus:border-indigo-500">
+                <button type="button" onclick="reSearchSingleBulkCandidate(${idx})" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded text-[10px] font-semibold whitespace-nowrap">再検索</button>
+              </div>
+
+              <div id="reSearchResults_${idx}" class="mt-1.5 max-h-44 overflow-y-auto no-scrollbar space-y-1 ${s.reSearchResults && s.reSearchResults.length > 0 ? '' : 'hidden'}">
+                ${(s.reSearchResults || []).map(item => {
+                  const raw = encodeURIComponent(JSON.stringify(item));
+                  return `
+                    <div onclick="applyITunesSongToCandidate(${idx}, '${raw}')" class="flex items-center gap-2 p-1.5 bg-slate-950 hover:bg-indigo-950/40 border border-slate-800 hover:border-indigo-600/60 rounded-lg cursor-pointer transition">
+                      ${item.artwork ? `<img src="${item.artwork}" class="w-8 h-8 rounded object-cover shrink-0 bg-slate-800">` : `<div class="w-8 h-8 rounded bg-slate-800 flex items-center justify-center text-[10px] text-slate-500 shrink-0">🎵</div>`}
+                      <div class="min-w-0 flex-1 text-[10px]">
+                        <div class="font-bold text-white truncate flex items-center gap-1">
+                          <span>${escapeHtml(item.title)}</span>
+                          ${item.isDuet ? '<span class="text-[8px] bg-purple-950 text-purple-300 px-1 rounded">デュエット</span>' : ''}
+                        </div>
+                        <div class="text-slate-400 truncate text-[9px]">${escapeHtml(item.artist)} • ${item.year || '年不明'} • ${escapeHtml(item.genre)}</div>
                       </div>
-                      <div class="text-slate-400 truncate text-[9px]">${escapeHtml(item.artist)} • ${item.year || '年不明'} • ${escapeHtml(item.genre)}</div>
+                      <span class="text-[9px] text-indigo-400 border border-indigo-700/60 bg-indigo-950/60 px-1.5 py-0.5 rounded font-bold shrink-0">選択</span>
                     </div>
-                    <span class="text-[9px] text-indigo-400 border border-indigo-700/60 bg-indigo-950/60 px-1.5 py-0.5 rounded font-bold shrink-0">選択</span>
-                  </div>
-                `;
-              }).join('')}
+                  `;
+                }).join('')}
+              </div>
             </div>
           </div>
-        </div>
-      ` : ''}
-    </div>
-  `).join('');
+        ` : ''}
+      </div>
+    `;
+  }).join('');
 }
 
 window.updateSearchKeyword = function(idx, val) {
@@ -412,7 +442,7 @@ window.reSearchSingleBulkCandidate = async function(idx) {
   }
 
   try {
-    const data = await fetchITunesApi(term, 30);
+    const data = await fetchITunesApi(term, 20);
     if (!data.results || data.results.length === 0) {
       if (resultsBox) resultsBox.innerHTML = '<div class="text-[10px] text-slate-500 py-1.5 text-center">曲が見つかりませんでした</div>';
       return;
@@ -705,6 +735,9 @@ function renderAllViews() {
   if (!document.getElementById('artistModal').classList.contains('hidden')) {
     renderArtistDiscography();
   }
+  if (!document.getElementById('modalPanelBulk').classList.contains('hidden')) {
+    renderBulkPreview();
+  }
 }
 
 window.loadRanking = async function() {
@@ -946,12 +979,8 @@ window.openArtistDiscography = async function(artistName) {
   lockBodyScroll(true);
 
   try {
-    const data = await fetchITunesApi(artistName, 200, 'artistTerm');
-    let results = data.results || [];
-    if (results.length === 0) {
-      const fallbackData = await fetchITunesApi(artistName, 200);
-      results = fallbackData.results || [];
-    }
+    const data = await fetchITunesApi(artistName, 50);
+    const results = data.results || [];
 
     const seen = new Set();
     artistDiscographySongs = [];
@@ -1074,13 +1103,10 @@ window.searchITunes = async function() {
 
   resultBox.classList.remove('hidden');
   sortRow.classList.add('hidden');
-  resultBox.innerHTML = '<div class="text-[11px] text-slate-500 py-1">最大200件を取得中...</div>';
+  resultBox.innerHTML = '<div class="text-[11px] text-slate-500 py-1">検索中...</div>';
 
   try {
-    let data = await fetchITunesApi(term, 200);
-    if (!data.results || data.results.length === 0) {
-      data = await fetchITunesApi(term, 200, 'songTerm');
-    }
+    const data = await fetchITunesApi(term, 50);
 
     if (!data.results || data.results.length === 0) {
       return resultBox.innerHTML = '<div class="text-[11px] text-slate-500 py-1">曲が見つかりませんでした</div>';
@@ -1166,7 +1192,7 @@ window.selectITunesSong = function(encoded) {
   document.getElementById('apiSortRow').classList.add('hidden');
 };
 
-// ピックアップ（旧セットリスト）機能
+// ピックアップ機能
 window.toggleSetlistDrawer = function() {
   document.getElementById('setlistDrawer').classList.toggle('translate-y-full');
 };
