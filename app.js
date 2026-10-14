@@ -28,6 +28,10 @@ let activeMoodAttrs = new Set();
 // 総括編集用
 let summaryCandidateSongs = [];
 
+// ユーザーが手動でソート・検索を変えた時以外の並び順固定用キャッシュ
+window.isUserSorting = false;
+let renderedSongOrderIds = [];
+
 // アーティスト連想マップ
 const ARTIST_RELATIONS = {
   'king gnu': ['Official髭男dism', 'Vaundy', '米津玄師', '藤井風'],
@@ -39,7 +43,7 @@ const ARTIST_RELATIONS = {
   'mr.children': ['スピッツ', 'コブクロ', 'ゆず', 'サザンオールスターズ']
 };
 
-// 主要アーティストのエイリアス（略称・かな対応）辞書
+// 主要アーティストのエイリアス（略称・かな対応）拡充辞書
 const ARTIST_ALIASES = {
   'king gnu': ['キングヌー', 'きんぐぬー', 'きんぐ', 'kinggnu'],
   'official髭男dism': ['ヒゲダン', 'ひげだん', 'ひげだんでぃずむ', '髭男', 'ひげ'],
@@ -60,7 +64,29 @@ const ARTIST_ALIASES = {
   'one ok rock': ['ワンオクロック', 'ワンオク', 'わんおく', '10969'],
   'superfly': ['スーパーフライ', 'すーぱーふらい'],
   'man with a mission': ['マンウィズアミッション', 'マンウィズ', 'mwam'],
-  'alexandros': ['アレキサンドロス', 'ドロス', 'あれき']
+  'alexandros': ['アレキサンドロス', 'ドロス', 'あれき'],
+  'ado': ['アド', 'あど'],
+  'lisa': ['リサ', 'りさ'],
+  'dish//': ['ディッシュ', 'でぃっしゅ', 'dish'],
+  'sixtones': ['ストーンズ', 'すとーんず', 'すと'],
+  'snow man': ['スノーマン', 'すのーまん', 'すの'],
+  'da pump': ['ダパンプ', 'だぱんぷ'],
+  'wacci': ['ワッチ', 'わっち'],
+  't.m.revolution': ['ティーエムレボリューション', 'てぃーえむ', 'tmr', '西川貴教'],
+  'creepy nuts': ['クリーピーナッツ', 'くりーぴーなっつ', 'くりーぴー']
+};
+
+// 定番「英字曲名」エイリアス辞書
+const TITLE_ALIASES = {
+  'pretender': ['プリテンダー', 'ぷりてんだー'],
+  'subtitle': ['サブタイトル', 'さぶたいとる'],
+  'idol': ['アイドル', 'あいどる'],
+  'marigold': ['マリーゴールド', 'まりーごーるど'],
+  'dry flower': ['ドライフラワー', 'どらいふらわー'],
+  'rpg': ['アールピージー', 'あーるぴーじー'],
+  'hanabi': ['ハナビ', 'はなび', '花火'],
+  'betelgeuse': ['ベテルギウス', 'べてるぎうす'],
+  'kaiju no hanauta': ['かいじゅうのはなうた', '怪獣の花唄']
 };
 
 const TIE_UP_PRESETS = [
@@ -207,6 +233,7 @@ function lockBodyScroll(lock) {
                          !document.getElementById('artistModal').classList.contains('hidden') ||
                          !document.getElementById('moodModal').classList.contains('hidden') ||
                          !document.getElementById('summaryModal').classList.contains('hidden') ||
+                         !document.getElementById('summaryAddPickerModal').classList.contains('hidden') ||
                          !document.getElementById('cardShareModal').classList.contains('hidden') ||
                          !document.getElementById('cardViewModal').classList.contains('hidden') ||
                          !document.getElementById('filterSheetBackdrop').classList.contains('hidden');
@@ -251,6 +278,7 @@ window.resetAllFiltersInSheet = function() {
   selectedAttr = 'all';
   selectedPitchRange = 'all';
   selectedTags.clear();
+  window.isUserSorting = true;
   syncFilterControlsVisual();
   render();
 };
@@ -329,12 +357,14 @@ window.removeFilterChip = function(type, val) {
   if (type === 'attr') selectedAttr = 'all';
   if (type === 'pitch') selectedPitchRange = 'all';
   if (type === 'tag') selectedTags.delete(val);
+  window.isUserSorting = true;
   syncFilterControlsVisual();
   render();
 };
 
 window.setPitchFilter = function(val) {
   selectedPitchRange = val;
+  window.isUserSorting = true;
   syncFilterControlsVisual();
   render();
 };
@@ -592,6 +622,7 @@ window.saveBulkSongs = async function() {
       if (i % 5 === 0) await new Promise(r => setTimeout(r, 20));
     }
     alert(`🎉 ${count}曲を一括登録しました！`);
+    window.isUserSorting = true;
     closeModal();
   } catch (err) {
     alert(`保存中にエラーが発生しました: ${err.message}`);
@@ -777,6 +808,7 @@ window.importBackupJSON = function(e) {
         count++;
       }
       alert(`🎉 ${count} 曲の復元が完了しました！`);
+      window.isUserSorting = true;
       closeSettingsModal();
     } catch (err) {
       alert("読み込み失敗: " + err.message);
@@ -877,35 +909,63 @@ function renderAllViews() {
 }
 
 // ==========================================
-// 流行チャート (Apple Music)
+// 流行曲 (Apple Music RSS / CORS対策)
 // ==========================================
 window.loadRanking = async function() {
   const container = document.getElementById('rankingList');
   container.innerHTML = '<div class="text-center text-slate-500 py-12 text-sm">ランキングを取得中...</div>';
-  try {
-    const res = await fetch('[https://itunes.apple.com/jp/rss/topsongs/limit=50/json](https://itunes.apple.com/jp/rss/topsongs/limit=50/json)');
-    const data = await res.json();
-    rankingSongs = (data.feed.entry || []).map((entry, idx) => {
-      let previewUrl = '';
-      if (entry.link) {
-        const links = Array.isArray(entry.link) ? entry.link : [entry.link];
-        const pLink = links.find(l => l.attributes && (l.attributes.title === 'Preview' || (l.attributes.href && l.attributes.href.includes('.m4a'))));
-        if (pLink) previewUrl = pLink.attributes.href;
-      }
-      return {
-        rank: idx + 1,
-        trackId: entry.id?.attributes?.['im:id'] || '',
-        title: entry['im:name'] ? entry['im:name'].label : '',
-        artist: entry['im:artist'] ? entry['im:artist'].label : '',
-        artwork: entry['im:image'] && entry['im:image'].length > 2 ? entry['im:image'][2].label : '',
-        year: entry['im:releaseDate'] ? entry['im:releaseDate'].label.substring(0, 4) : '',
-        genre: entry.category?.attributes?.label || 'J-Pop',
-        previewUrl
-      };
-    });
+
+  const urls = [
+    '[https://itunes.apple.com/jp/rss/topsongs/limit=50/json](https://itunes.apple.com/jp/rss/topsongs/limit=50/json)',
+    '[https://api.allorigins.win/raw?url=](https://api.allorigins.win/raw?url=)' + encodeURIComponent('[https://itunes.apple.com/jp/rss/topsongs/limit=50/json](https://itunes.apple.com/jp/rss/topsongs/limit=50/json)')
+  ];
+
+  let success = false;
+  let lastError = null;
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const entries = data.feed?.entry || [];
+      if (entries.length === 0) throw new Error("エントリーが空です");
+
+      rankingSongs = entries.map((entry, idx) => {
+        let previewUrl = '';
+        if (entry.link) {
+          const links = Array.isArray(entry.link) ? entry.link : [entry.link];
+          const pLink = links.find(l => l.attributes && (l.attributes.title === 'Preview' || (l.attributes.href && l.attributes.href.includes('.m4a'))));
+          if (pLink) previewUrl = pLink.attributes.href;
+        }
+        return {
+          rank: idx + 1,
+          trackId: entry.id?.attributes?.['im:id'] || '',
+          title: entry['im:name'] ? entry['im:name'].label : '',
+          artist: entry['im:artist'] ? entry['im:artist'].label : '',
+          artwork: entry['im:image'] && entry['im:image'].length > 2 ? entry['im:image'][2].label : '',
+          year: entry['im:releaseDate'] ? entry['im:releaseDate'].label.substring(0, 4) : '',
+          genre: entry.category?.attributes?.label || 'J-Pop',
+          previewUrl
+        };
+      });
+
+      success = true;
+      break;
+    } catch (e) {
+      lastError = e;
+    }
+  }
+
+  if (success) {
     renderRanking();
-  } catch (e) {
-    container.innerHTML = '<div class="text-center text-rose-400 py-12 text-sm">ランキングの取得に失敗しました</div>';
+  } else {
+    container.innerHTML = `
+      <div class="bg-rose-950/40 border border-rose-900/60 p-4 rounded-xl text-center space-y-1">
+        <div class="text-xs font-bold text-rose-300">⚠️ ランキングの取得に失敗しました</div>
+        <div class="text-[10px] text-rose-400 font-mono">${escapeHtml(lastError ? lastError.message : '通信環境またはAppleサーバー制限')}</div>
+      </div>
+    `;
   }
 };
 
@@ -1493,7 +1553,7 @@ function updateToggleAllExpandButtonState() {
   icon.textContent = isAllExpanded ? '📕' : '📖';
 }
 
-// 検索マッチング判定（かな・カナ・英字・略称辞書・ローマ字）
+// 検索マッチング判定（かな・カナ・英字・略称辞書・曲名辞書）
 function matchSearchQuery(song, rawQuery) {
   if (!rawQuery) return true;
   const qLower = rawQuery.toLowerCase().trim();
@@ -1505,8 +1565,6 @@ function matchSearchQuery(song, rawQuery) {
     (song.artist || '').toLowerCase(),
     (song.memo || '').toLowerCase(),
     (song.genre || '').toLowerCase(),
-    (song.maxPitch || '').toLowerCase(),
-    (song.minPitch || '').toLowerCase(),
     (song.year ? song.year.toString() : ''),
     ...(song.tags || []).map(t => t.toLowerCase())
   ];
@@ -1519,9 +1577,20 @@ function matchSearchQuery(song, rawQuery) {
 
   if (targetKata.includes(qKata) || targetHira.includes(qHira)) return true;
 
+  // アーティスト辞書突合
   const artistLower = (song.artist || '').toLowerCase();
   for (const [canonical, aliases] of Object.entries(ARTIST_ALIASES)) {
     if (artistLower.includes(canonical)) {
+      if (aliases.some(alias => alias.includes(qKata) || alias.includes(qHira) || qLower.includes(alias))) {
+        return true;
+      }
+    }
+  }
+
+  // 曲名辞書突合
+  const titleLower = (song.title || '').toLowerCase();
+  for (const [canonical, aliases] of Object.entries(TITLE_ALIASES)) {
+    if (titleLower.includes(canonical)) {
       if (aliases.some(alias => alias.includes(qKata) || alias.includes(qHira) || qLower.includes(alias))) {
         return true;
       }
@@ -1567,21 +1636,34 @@ function getCurrentFilteredSongs() {
 }
 
 // ==========================================
-// マイリスト描画
+// マイリスト描画（位置保持・見失い防止）
 // ==========================================
 window.render = function() {
   const sortSelect = document.getElementById('sortSelect');
   const sortMode = sortSelect ? sortSelect.value : 'lastSung';
   let filtered = getCurrentFilteredSongs();
 
-  filtered.sort((a, b) => {
-    if (sortMode === 'lastSung') return (b.lastSungAt || 0) - (a.lastSungAt || 0);
-    if (sortMode === 'singCount') return (b.singCount || 0) - (a.singCount || 0);
-    if (sortMode === 'scoreVal') return (parseFloat(b.scoreVal) || 0) - (parseFloat(a.scoreVal) || 0);
-    if (sortMode === 'releaseYear') return (parseInt(b.year, 10) || 0) - (parseInt(a.year, 10) || 0);
-    if (sortMode === 'title') return (a.title || '').localeCompare(b.title || '', 'ja');
-    return (b.createdAt || 0) - (a.createdAt || 0);
-  });
+  // 歌唱記録直後などでユーザーが明示的にソートを変えていない場合はDOM位置を保持
+  if (!window.isUserSorting && renderedSongOrderIds.length > 0) {
+    const orderMap = new Map();
+    renderedSongOrderIds.forEach((id, idx) => orderMap.set(id, idx));
+    filtered.sort((a, b) => {
+      const idxA = orderMap.has(a.id) ? orderMap.get(a.id) : 999999;
+      const idxB = orderMap.has(b.id) ? orderMap.get(b.id) : 999999;
+      return idxA - idxB;
+    });
+  } else {
+    filtered.sort((a, b) => {
+      if (sortMode === 'lastSung') return (b.lastSungAt || 0) - (a.lastSungAt || 0);
+      if (sortMode === 'singCount') return (b.singCount || 0) - (a.singCount || 0);
+      if (sortMode === 'scoreVal') return (parseFloat(b.scoreVal) || 0) - (parseFloat(a.scoreVal) || 0);
+      if (sortMode === 'releaseYear') return (parseInt(b.year, 10) || 0) - (parseInt(a.year, 10) || 0);
+      if (sortMode === 'title') return (a.title || '').localeCompare(b.title || '', 'ja');
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    });
+    renderedSongOrderIds = filtered.map(s => s.id);
+    window.isUserSorting = false;
+  }
 
   const allTags = Array.from(new Set((window.songs || []).flatMap(s => s.tags || [])));
   const tagContainer = document.getElementById('tagFilterList');
@@ -1691,7 +1773,7 @@ window.render = function() {
             </div>
             <div class="flex items-center gap-1">
               <button onclick="${inSetlist ? `removeFromSetlist('${s.id}')` : `addToSetlist('${s.id}')`}" class="text-[10px] px-2 py-0.5 rounded-md font-medium border transition whitespace-nowrap ${inSetlist ? 'bg-indigo-950 border-indigo-600 text-indigo-300' : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'}">
-                ${inSetlist ? '✓ ピック' : '＋ ピック'}
+                ${inSetlist ? '✓ ピックアップ' : '＋ ピックアップ'}
               </button>
               <button onclick="toggleExpandCard('${s.id}')" class="text-slate-500 hover:text-slate-300 text-xs px-1 py-0.5">
                 <span>${isExpanded ? '▲' : '▼'}</span>
@@ -1740,28 +1822,33 @@ window.render = function() {
 window.toggleTagFilter = function(tag) {
   if (selectedTags.has(tag)) selectedTags.delete(tag);
   else selectedTags.add(tag);
+  window.isUserSorting = true;
   render();
 };
-window.clearSelectedTags = function() { selectedTags.clear(); render(); };
+window.clearSelectedTags = function() { selectedTags.clear(); window.isUserSorting = true; render(); };
 window.setTagFilterMode = function(mode) {
   tagFilterMode = mode;
   document.getElementById('tagModeAnd').className = mode === 'AND' ? "px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-600 text-white" : "px-1.5 py-0.5 rounded text-[9px] text-slate-400 hover:text-white";
   document.getElementById('tagModeOr').className = mode === 'OR' ? "px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-600 text-white" : "px-1.5 py-0.5 rounded text-[9px] text-slate-400 hover:text-white";
+  window.isUserSorting = true;
   render();
 };
 
 window.setScoreFilter = function(score) {
   selectedScore = score;
+  window.isUserSorting = true;
   syncFilterControlsVisual();
   render();
 };
 window.setDecadeFilter = function(decade) {
   selectedDecade = decade;
+  window.isUserSorting = true;
   syncFilterControlsVisual();
   render();
 };
 window.setAttrFilter = function(attr) {
   selectedAttr = attr;
+  window.isUserSorting = true;
   syncFilterControlsVisual();
   render();
 };
@@ -2174,6 +2261,7 @@ window.handleSave = async function(e) {
       lastSungAt: null
     });
   }
+  window.isUserSorting = true;
   closeModal();
 };
 
@@ -2204,7 +2292,7 @@ window.closeRandom = function() {
 };
 
 // ==========================================
-// 💡 空気読み選曲機能
+// 💡 空気読み選曲機能（刷新・エラー可視化）
 // ==========================================
 window.openMoodSuggestModal = function() {
   currentMoodFlow = [];
@@ -2250,7 +2338,7 @@ window.pushMoodStep = function(tensionLabel) {
   if (activeMoodAttrs.has('ani')) attrLabels.push('🎬 アニソン');
   if (activeMoodAttrs.has('vocaloid')) attrLabels.push('🤖 ボカロ');
   if (activeMoodAttrs.has('nostalgia')) attrLabels.push('📻 懐メロ');
-  if (activeMoodAttrs.has('trend')) attrLabels.push('👶 最新');
+  if (activeMoodAttrs.has('trend')) attrLabels.push('👶 最新曲');
 
   const stepItem = {
     attrs: [...attrLabels],
@@ -2290,13 +2378,17 @@ window.runMoodSuggest = async function() {
   const pool = myPlayable.length >= 3 ? myPlayable : (window.songs || []);
 
   const flowSummary = currentMoodFlow.map((s, i) => `${i + 1}曲前: ${s.display}`).join('\n');
-  const songListText = pool.slice(0, 40).map(s => `- id:${s.id} / ${s.title} (${s.artist || '歌手不明'}) / 習熟度:${s.score} / 最高音:${s.maxPitch || '未設定'}`).join('\n');
+  const songListText = pool.slice(0, 50).map(s => {
+    return `- id:${s.id} / ${s.title} (${s.artist || '歌手不明'}) / 年代:${s.year || '不明'} / ジャンル:${s.genre || ''} / タグ:${(s.tags||[]).join(',')} / 習熟度:${s.score} / 最高音:${s.maxPitch || '未設定'}`;
+  }).join('\n');
 
   const apiKey = localStorage.getItem('ohako_gemini_api_key') || '';
+  let apiErrorMessage = null;
+
   if (apiKey) {
     try {
-      const prompt = `あなたはカラオケの超一流アシスタント・相棒です。
-以下のカラオケルームの【直近の曲の流れ】を分析し、ユーザーの【持ち曲リスト】の中から今歌うべきベストな3候補を決定してください。
+      const prompt = `あなたはカラオケの超一流専属マネージャー・AI相棒です。
+以下のカラオケルームの【直近の曲の流れ・空気感】を分析し、ユーザーの【持ち曲リスト】の中から今歌うべきベストな3候補を決定してください。
 
 【直近の流れ】
 ${flowSummary}
@@ -2304,11 +2396,16 @@ ${flowSummary}
 【持ち曲候補リスト】
 ${songListText}
 
-以下のJSON配列形式のみで出力してください。Markdown等の装飾は不要です。
+【選曲要件】
+1. 指定された空気（バラード、盛り上がり、アニソン、懐メロなど）を最優先で尊重してください。
+2. 「王道追随枠（今の空気に完璧に寄り添う）」「空気転換枠（良い塩梅で雰囲気を変える）」「スパイス枠（意表を突く隠し球）」の3枠を選んでください。
+3. コメントは毎回定型文ではなく、その曲の歌詞の魅力、高音の聴かせどころ、ルームの反応予想などを交えてウィットに富んだ相棒口調で書いてください。
+
+以下のJSON配列形式のみで出力してください。Markdown装飾や余計な文は不要です。
 [
-  { "id": "曲のid", "category": "王道追随枠", "comment": "相棒としてのウィットに富んだ推薦理由（短め）" },
-  { "id": "曲のid", "category": "空気転換枠", "comment": "推薦理由" },
-  { "id": "曲のid", "category": "スパイス変化球枠", "comment": "推薦理由" }
+  { "id": "曲のid", "category": "王道追随枠", "comment": "相棒コメント（70〜100字程度）" },
+  { "id": "曲のid", "category": "空気転換枠", "comment": "相棒コメント（70〜100字程度）" },
+  { "id": "曲のid", "category": "スパイス枠", "comment": "相棒コメント（70〜100字程度）" }
 ]`;
 
       const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){apiKey}`, {
@@ -2316,42 +2413,100 @@ ${songListText}
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
       });
+
+      if (!res.ok) {
+        throw new Error(`Gemini API HTTP ${res.status}: ${res.statusText}`);
+      }
+
       const data = await res.json();
       const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
       const cleanJson = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
       const suggestions = JSON.parse(cleanJson);
 
-      renderMoodResults(suggestions);
+      if (!Array.isArray(suggestions) || suggestions.length === 0) {
+        throw new Error("AIのレスポンスが正しい配列形式ではありませんでした");
+      }
+
+      renderMoodResults(suggestions, null);
       btn.disabled = false;
       btn.classList.remove('opacity-50');
       return;
     } catch (e) {
-      console.warn("Gemini API fallback to local rule:", e);
+      console.warn("Gemini API Error:", e);
+      apiErrorMessage = `Gemini連携失敗: ${e.message}`;
     }
+  } else {
+    apiErrorMessage = "Gemini APIキー未設定（⚙️管理設定で登録すると本格AI提案が有効になります）";
   }
 
-  // フォールバック（ルールベース）
-  const picked = [...pool].sort(() => 0.5 - Math.random()).slice(0, 3);
+  // フォールバック（インテリジェント・ルールベース）
+  const lastStep = currentMoodFlow[currentMoodFlow.length - 1];
+  const isBallad = currentMoodFlow.some(s => s.tension.includes('バラード'));
+  const isHighTension = currentMoodFlow.some(s => s.tension.includes('盛り上がり'));
+  const isAni = currentMoodFlow.some(s => s.attrs.some(a => a.includes('アニソン')));
+  const isNostalgia = currentMoodFlow.some(s => s.attrs.some(a => a.includes('懐メロ')));
+
+  let matchCandidates = pool.filter(s => {
+    const text = `${s.title} ${s.artist} ${s.genre} ${(s.tags||[]).join(' ')} ${s.memo}`.toLowerCase();
+    if (isBallad && (text.includes('バラード') || text.includes('バラ') || text.includes('しっとり'))) return true;
+    if (isHighTension && (text.includes('盛り上') || text.includes('アッパー') || text.includes('ロック'))) return true;
+    if (isAni && (text.includes('アニメ') || text.includes('アニソン') || text.includes('主題歌'))) return true;
+    if (isNostalgia && (text.includes('90年代') || text.includes('2000年代') || (parseInt(s.year, 10) < 2010))) return true;
+    return false;
+  });
+
+  if (matchCandidates.length < 3) {
+    matchCandidates = [...pool];
+  }
+
+  const shuffled = [...matchCandidates].sort(() => 0.5 - Math.random());
+  const picked = shuffled.slice(0, 3);
   const categories = ["王道追随枠", "空気転換枠", "スパイス枠"];
-  const comments = [
-    "今の熱気をそのままキープして手堅く刺す十八番！",
-    "一旦喉を休めつつ、ガラッと空気を変える大人の選曲。",
-    "ここでこれ入れたら『懐かしい！』と全員が食いつく隠し球。"
-  ];
+  
+  const commentsPool = {
+    ballad: [
+      "会場がしっとり温まった今こそ響く美メロバラード。サビの情感を込めて歌い上げましょう！",
+      "あえてキーを下げずに原曲の切なさをそのまま届ける一手。全員の耳を奪えます。",
+      "バラードの流れを壊さず、少し大人の雰囲気に引き込む絶妙なアクセント曲。"
+    ],
+    upbeat: [
+      "直前のボルテージを最高潮へ引き継ぐ鉄板アンセム！手拍子を巻き込んでいきましょう。",
+      "熱気あふれるフロアにさらに火をつけるハイテンションナンバー。思い切り喉を解放！",
+      "勢いそのままに変化球！『その曲きたか！』とフロアを沸かせる一撃です。"
+    ],
+    general: [
+      "直前の流れを自然に継承しつつ、自分の十八番の安定感をしっかり見せつける王道選曲。",
+      "ここでガラッとテンポを変えて耳目を集める。緩急をつける相棒おすすめの一手。",
+      "意表を突きつつ全員が口ずさめる絶妙なポジション。カラオケ巧者ならではの選曲です。"
+    ]
+  };
+
+  const cPool = isBallad ? commentsPool.ballad : isHighTension ? commentsPool.upbeat : commentsPool.general;
+
   const localSuggestions = picked.map((s, idx) => ({
     id: s.id,
     category: categories[idx] || "おすすめ枠",
-    comment: comments[idx] || "間違いない一曲です！"
+    comment: cPool[idx % cPool.length]
   }));
 
-  renderMoodResults(localSuggestions);
+  renderMoodResults(localSuggestions, apiErrorMessage);
   btn.disabled = false;
   btn.classList.remove('opacity-50');
 };
 
-function renderMoodResults(suggestions) {
+function renderMoodResults(suggestions, errorMessage) {
   const resultBox = document.getElementById('moodSuggestResult');
-  resultBox.innerHTML = suggestions.map(item => {
+  let errHtml = '';
+  if (errorMessage) {
+    errHtml = `
+      <div class="bg-amber-950/70 border border-amber-800/80 p-2 rounded-xl text-[10px] text-amber-200 flex items-center justify-between">
+        <span>⚠️ ${escapeHtml(errorMessage)}</span>
+        <span class="text-[9px] bg-amber-900 px-1 py-0.2 rounded font-bold">ローカル選曲</span>
+      </div>
+    `;
+  }
+
+  resultBox.innerHTML = errHtml + suggestions.map(item => {
     const s = (window.songs || []).find(x => x.id === item.id) || { title: 'おすすめ曲', artist: '' };
     return `
       <div class="p-2.5 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
@@ -2374,7 +2529,7 @@ function renderMoodResults(suggestions) {
 }
 
 // ==========================================
-// 🤖 勝手にカラオケ総括・評論
+// 🤖 勝手にカラオケ総括・評論（大幅強化）
 // ==========================================
 window.openSummaryModal = function() {
   const todayStr = new Date().toISOString().split('T')[0];
@@ -2422,8 +2577,9 @@ function renderSummaryCandidateList() {
   }
 
   container.innerHTML = summaryCandidateSongs.map((s, idx) => `
-    <div class="flex items-center justify-between p-2 bg-slate-950 border border-slate-800 rounded-xl text-xs gap-2">
+    <div data-idx="${idx}" draggable="true" class="summary-drag-item flex items-center justify-between p-2 bg-slate-950 border border-slate-800 rounded-xl text-xs gap-2 select-none">
       <div class="flex items-center gap-2 min-w-0">
+        <span class="cursor-grab active:cursor-grabbing text-slate-500 font-mono text-sm px-1">☰</span>
         <span class="font-mono text-indigo-400 font-bold w-4 text-center shrink-0">${idx + 1}</span>
         <div class="min-w-0">
           <div class="font-bold text-white truncate">${escapeHtml(s.title)}</div>
@@ -2431,27 +2587,147 @@ function renderSummaryCandidateList() {
         </div>
       </div>
       <div class="flex items-center gap-1 shrink-0">
-        <button onclick="moveSummarySong(${idx}, -1)" ${idx === 0 ? 'disabled class="opacity-20 p-1"' : 'class="text-slate-400 hover:text-white p-1"'}>▲</button>
-        <button onclick="moveSummarySong(${idx}, 1)" ${idx === summaryCandidateSongs.length - 1 ? 'disabled class="opacity-20 p-1"' : 'class="text-slate-400 hover:text-white p-1"'}>▼</button>
         <button onclick="removeSummarySong(${idx})" class="text-slate-500 hover:text-rose-400 p-1">✕</button>
       </div>
     </div>
   `).join('');
+
+  attachSummaryTouchDragListeners();
 }
 
-window.moveSummarySong = function(idx, dir) {
-  const target = idx + dir;
-  if (target < 0 || target >= summaryCandidateSongs.length) return;
-  const temp = summaryCandidateSongs[idx];
-  summaryCandidateSongs[idx] = summaryCandidateSongs[target];
-  summaryCandidateSongs[target] = temp;
-  renderSummaryCandidateList();
-};
+// スワイプ・ドラッグ並び替え制御
+function attachSummaryTouchDragListeners() {
+  const items = document.querySelectorAll('.summary-drag-item');
+  let draggedIdx = null;
+
+  items.forEach(el => {
+    el.addEventListener('dragstart', (e) => {
+      draggedIdx = parseInt(el.dataset.idx, 10);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    el.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      el.classList.add('border-indigo-500');
+    });
+
+    el.addEventListener('dragleave', () => {
+      el.classList.remove('border-indigo-500');
+    });
+
+    el.addEventListener('drop', (e) => {
+      e.preventDefault();
+      el.classList.remove('border-indigo-500');
+      const targetIdx = parseInt(el.dataset.idx, 10);
+      if (draggedIdx !== null && draggedIdx !== targetIdx) {
+        const item = summaryCandidateSongs.splice(draggedIdx, 1)[0];
+        summaryCandidateSongs.splice(targetIdx, 0, item);
+        renderSummaryCandidateList();
+      }
+    });
+
+    // モバイル用タッチスワイプ簡易移動
+    let startY = 0;
+    el.addEventListener('touchstart', (e) => {
+      startY = e.touches[0].clientY;
+    }, { passive: true });
+
+    el.addEventListener('touchend', (e) => {
+      const endY = e.changedTouches[0].clientY;
+      const diffY = endY - startY;
+      const currentIdx = parseInt(el.dataset.idx, 10);
+      if (diffY < -35 && currentIdx > 0) {
+        // 上へスワイプ
+        const temp = summaryCandidateSongs[currentIdx];
+        summaryCandidateSongs[currentIdx] = summaryCandidateSongs[currentIdx - 1];
+        summaryCandidateSongs[currentIdx - 1] = temp;
+        renderSummaryCandidateList();
+      } else if (diffY > 35 && currentIdx < summaryCandidateSongs.length - 1) {
+        // 下へスワイプ
+        const temp = summaryCandidateSongs[currentIdx];
+        summaryCandidateSongs[currentIdx] = summaryCandidateSongs[currentIdx + 1];
+        summaryCandidateSongs[currentIdx + 1] = temp;
+        renderSummaryCandidateList();
+      }
+    }, { passive: true });
+  });
+}
 
 window.removeSummarySong = function(idx) {
   summaryCandidateSongs.splice(idx, 1);
   renderSummaryCandidateList();
 };
+
+// 曲追加ピッカー
+window.openAddSummarySongPicker = function() {
+  document.getElementById('summaryAddSearchInput').value = '';
+  renderSummaryAddPickerList();
+  document.getElementById('summaryAddPickerModal').classList.remove('hidden');
+};
+
+window.closeAddSummarySongPicker = function() {
+  document.getElementById('summaryAddPickerModal').classList.add('hidden');
+};
+
+window.renderSummaryAddPickerList = function() {
+  const q = (document.getElementById('summaryAddSearchInput')?.value || '').trim();
+  const container = document.getElementById('summaryAddPickerList');
+  const pool = (window.songs || []).filter(s => matchSearchQuery(s, q));
+
+  if (pool.length === 0) {
+    container.innerHTML = '<div class="text-center text-slate-500 py-6 text-xs">一致する曲がありません</div>';
+    return;
+  }
+
+  container.innerHTML = pool.slice(0, 30).map(s => `
+    <div class="flex items-center justify-between p-2 bg-slate-950 border border-slate-800 rounded-xl text-xs gap-2">
+      <div class="min-w-0">
+        <div class="font-bold text-white truncate">${escapeHtml(s.title)}</div>
+        <div class="text-[10px] text-slate-400 truncate">${escapeHtml(s.artist || '歌手未設定')} • ${s.key === '0' ? '原曲' : 'キー ' + s.key}</div>
+      </div>
+      <button onclick="addSongToSummary('${s.id}')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap">
+        ＋ 追加
+      </button>
+    </div>
+  `).join('');
+};
+
+window.addSongToSummary = function(id) {
+  const s = (window.songs || []).find(x => x.id === id);
+  if (!s) return;
+  summaryCandidateSongs.push(s);
+  renderSummaryCandidateList();
+  closeAddSummarySongPicker();
+};
+
+// 実戦スタッツ計算
+function calculateSummaryStats(songs) {
+  if (songs.length === 0) return null;
+
+  let highestPitch = { pitch: '--', song: '--', rank: 0 };
+  let oasisPitch = { pitch: '--', song: '--', rank: 999 };
+
+  songs.forEach(s => {
+    const rank = getPitchRank(s.maxPitch);
+    if (rank > 0) {
+      if (rank > highestPitch.rank) highestPitch = { pitch: s.maxPitch, song: s.title, rank };
+      if (rank < oasisPitch.rank) oasisPitch = { pitch: s.maxPitch, song: s.title, rank };
+    }
+  });
+
+  const masteredCount = songs.filter(s => s.score === '得意').length;
+  const playableCount = songs.filter(s => s.score === '歌える').length;
+  const ohakoDegree = Math.round(((masteredCount * 1.0 + playableCount * 0.7) / Math.max(songs.length, 1)) * 100);
+
+  const adjCount = songs.filter(s => s.key && s.key !== '0' && s.key !== '原曲').length;
+
+  return {
+    highest: highestPitch.rank > 0 ? `${highestPitch.pitch}（${highestPitch.song}）` : '未登録',
+    oasis: oasisPitch.rank < 999 ? `${oasisPitch.pitch}（${oasisPitch.song}）` : '未登録',
+    ohakoDegree: `${ohakoDegree}%`,
+    adjRatio: `${adjCount}/${songs.length}曲`
+  };
+}
 
 window.generateAiSummary = async function() {
   if (summaryCandidateSongs.length === 0) return alert("総括対象の曲がありません。");
@@ -2461,53 +2737,86 @@ window.generateAiSummary = async function() {
   btn.disabled = true;
   btn.classList.add('opacity-50');
   resultBox.classList.remove('hidden');
-  resultBox.innerHTML = '<div class="text-center text-indigo-300 text-xs py-4">✨ AI相棒が本日の歌唱を愛とユーモアたっぷりに執筆中...</div>';
+  resultBox.innerHTML = '<div class="text-center text-indigo-300 text-xs py-4">✨ AI相棒が実戦スタッツを精査し、愛ある辛口講評を執筆中...</div>';
 
+  const stats = calculateSummaryStats(summaryCandidateSongs);
   const songRows = summaryCandidateSongs.map((s, i) => `${i + 1}. ${s.title} (${s.artist || '歌手不明'}) [キー:${s.key || '0'}, 最高音:${s.maxPitch || '未設定'}, 習熟度:${s.score || '不明'}]`).join('\n');
   const apiKey = localStorage.getItem('ohako_gemini_api_key') || '';
 
+  const statsHeaderHtml = `
+    <div class="bg-indigo-950/60 border border-indigo-800/80 p-2.5 rounded-xl space-y-1 mb-2">
+      <div class="text-[10px] font-bold text-indigo-300">📊 実戦スタッツまとめ</div>
+      <div class="grid grid-cols-2 gap-1.5 text-[11px]">
+        <div>🔥 最高到達点: <strong class="text-amber-300">${escapeHtml(stats.highest)}</strong></div>
+        <div>🌿 喉のオアシス: <strong class="text-emerald-300">${escapeHtml(stats.oasis)}</strong></div>
+        <div>👑 本日の十八番度: <strong class="text-white">${stats.ohakoDegree}</strong></div>
+        <div>🎯 キー調整活用: <strong class="text-indigo-300">${stats.adjRatio}</strong></div>
+      </div>
+    </div>
+  `;
+
   if (apiKey) {
     try {
-      const prompt = `あなたはカラオケの辛口かつ愛情深い専属マネージャー（相棒）です。
-本日のカラオケ歌唱リストを分析し、以下のフォーマットでウィットに富んだ総括レポートを作成してください。
+      const prompt = `あなたはカラオケの超一流にして辛口・情熱的・愛情深い専属マネージャー（相棒）です。
+本日のカラオケ歌唱リストおよび実戦スタッツを徹底分析し、ユーザーの予想を超えるウィット・深み・切れ味のある総括レポートを作成してください。
+
+【本日の実戦スタッツ】
+- 最高到達点: ${stats.highest}
+- 喉のオアシス曲: ${stats.oasis}
+- 十八番度: ${stats.ohakoDegree}
+- キー調整: ${stats.adjRatio}
 
 【本日の歌唱リスト（歌った順）】
 ${songRows}
 
-【出力フォーマット】
+【講評執筆の要件】
+1. 単なる曲の羅列や褒め言葉に終始せず、曲順のストーリー性、喉の酷使ペース配分、キー調整のファインプレー（または原曲無茶）、選曲の情緒（アッパーとバラードの乱高下など）をプロのマネージャー視点で鋭く愛をもって突っ込んでください。
+2. ボリュームは読み応えのある600〜800字程度。
+3. 以下のフォーマットを必ず使用してください。
+
 ■ 本日のセトリ二つ名（称号）
-（例: 「喉酷使！hiA乱れ打ちギグ」「2000年代J-POP亡霊セトリ」のようなパンチの効いたタイトル）
+（パンチのある尖った称号）
 
-■ 相棒からの辛口＆愛あるレビュー
-（曲順のドラマ、高音の無茶、キー調整のファインプレー、世代感などを鋭くユーモラスに講評・300字程度）
+■ 相棒からの辛口＆情熱レビュー
+（曲順ドラマ、喉のマネジメント、世代感などを鋭くユーモラスに講評）
 
-■ 本日のMVP曲 & 労いの一言`;
+■ 本日のベストパフォーマンス賞 & 渇入れ（次回への課題）`;
 
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
       });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+
       const data = await res.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      resultBox.innerHTML = `<div class="whitespace-pre-wrap leading-relaxed text-indigo-100">${escapeHtml(text)}</div>`;
+      if (!text) throw new Error("AIから回答テキストが取得できませんでした");
+
+      resultBox.innerHTML = statsHeaderHtml + `<div class="whitespace-pre-wrap leading-relaxed text-indigo-100 text-xs">${escapeHtml(text)}</div>`;
       btn.disabled = false;
       btn.classList.remove('opacity-50');
       return;
     } catch (e) {
-      console.warn("AI summary fallback:", e);
+      console.warn("AI summary error:", e);
     }
   }
 
-  // フォールバック
+  // フォールバック（スタッツ＋長文ローカルレビュー）
   const titles = summaryCandidateSongs.map(s => s.title);
-  resultBox.innerHTML = `
-    <div class="space-y-1.5 text-xs text-indigo-100">
-      <div class="font-bold text-amber-400 text-sm">🏆 称号: 『名曲乱れ打ち！全力十八番ナイト』</div>
-      <p class="leading-relaxed">
-        全${summaryCandidateSongs.length}曲を完走！「${escapeHtml(titles[0] || '')}」からスタートし、ラストを「${escapeHtml(titles[titles.length - 1] || '')}」で締めくくる見事な構成でした。
-        喉のスタミナ配分も素晴らしく、相棒としても頼もしい実戦記録です。お疲れ様でした！
+  resultBox.innerHTML = statsHeaderHtml + `
+    <div class="space-y-2 text-xs text-indigo-100 leading-relaxed">
+      <div class="font-bold text-amber-400 text-sm">🏆 称号: 『喉酷使！意地と情熱のハイピッチ・ショウダウン』</div>
+      <p>
+        全${summaryCandidateSongs.length}曲の激闘、お疲れ様でした！初手「${escapeHtml(titles[0] || '')}」で会場の空気を一気に掴んだまでは完璧なマネジメントでしたが、中盤以降のセットリストはまさにスリリング。最高到達点【${escapeHtml(stats.highest)}】へのアタックは圧巻だった反面、喉のスタミナ配分を完全に無視したパッション選曲に相棒としては冷や汗の連続でした。
       </p>
+      <p>
+        十八番度は【${stats.ohakoDegree}】と高水準をマーク。オアシス曲【${escapeHtml(stats.oasis)}】を挟む冷静さがあったからこそ、最後まで歌声を保てたファインプレーと言えます。
+      </p>
+      <div class="bg-slate-900 p-2 rounded-lg border border-slate-800 text-[11px] text-slate-300">
+        📢 <strong>相棒からの渇入れ:</strong> 次回は前半にキーを1つ下げた調整曲を差し込み、後半の爆発力を温存するスマートな構成を期待しています！
+      </div>
     </div>
   `;
   btn.disabled = false;
@@ -2515,11 +2824,12 @@ ${songRows}
 };
 
 // ==========================================
-// 📇 私の十八番名刺（シェア）
+// 📇 私の十八番名刺（シェア & 完全ゲストモード）
 // ==========================================
 let currentCardScope = 'mastered';
 
 window.openCardShareModal = function() {
+  closeSettingsModal();
   selectCardScope('mastered');
   document.getElementById('cardShareModal').classList.remove('hidden');
   lockBodyScroll(true);
@@ -2604,11 +2914,15 @@ function checkAndOpenSharedCard() {
 }
 
 function renderCardViewScreen(list) {
+  // 通常管理UIを完全ガード（ゲストモード化）
+  const header = document.getElementById('appMainHeader');
+  if (header) header.classList.add('hidden');
+
   const modal = document.getElementById('cardViewModal');
   const container = document.getElementById('cardViewList');
   const subEl = document.getElementById('cardViewSubtitle');
 
-  subEl.textContent = `全 ${list.length} 曲のレパートリー`;
+  subEl.textContent = `全 ${list.length} 曲のレパートリー（閲覧専用）`;
   container.innerHTML = list.map((item, idx) => {
     const [title, artist, key, score, previewUrl] = item;
     const playId = `card_view_${idx}`;
@@ -2639,9 +2953,14 @@ function renderCardViewScreen(list) {
 
 window.closeCardView = function() {
   document.getElementById('cardViewModal').classList.add('hidden');
+  const header = document.getElementById('appMainHeader');
+  if (header) header.classList.remove('hidden');
   window.location.hash = '';
   lockBodyScroll(false);
 };
+
+// URLハッシュ変化検知（アプリ起動中の名刺URL貼り付け対応）
+window.addEventListener('hashchange', checkAndOpenSharedCard);
 
 window.addEventListener('DOMContentLoaded', () => {
   checkAndOpenSharedCard();
