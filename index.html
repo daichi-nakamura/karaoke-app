@@ -11,19 +11,24 @@
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     .bottom-sheet { transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
     .touch-none { touch-action: none; }
-    .dragging-card {
-      opacity: 0.92;
-      transform: scale(1.03);
-      box-shadow: 0 20px 25px -5px rgba(99, 102, 241, 0.3), 0 8px 10px -6px rgba(99, 102, 241, 0.3);
-      border-color: #6366f1 !important;
-      z-index: 50;
-      position: relative;
+    .statement-text {
+      word-break: auto-phrase;
+      text-wrap: balance;
     }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen pb-32 font-sans select-none">
 
-  <!-- ヘッダー (インラインSVGタイポグラフィロゴ) -->
+  <!-- デモモード告知バナー -->
+  <div id="demoModeBanner" class="hidden bg-indigo-950/90 border-b border-indigo-800/80 px-3 py-1.5 text-center text-xs text-indigo-200 flex items-center justify-between">
+    <div class="flex items-center gap-1.5 mx-auto">
+      <span>👀</span>
+      <span class="font-bold">デモ体験中</span>
+      <span class="text-[10px] text-slate-400">（端末の保存領域のみを使用しています）</span>
+    </div>
+  </div>
+
+  <!-- ヘッダー (インラインSVGタイポグラフィロゴ・装飾ドット削除済) -->
   <header id="appMainHeader" class="sticky top-0 z-20 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-3.5 py-2 space-y-2">
     <div class="max-w-md mx-auto flex items-center justify-between gap-2">
       <div class="flex items-center gap-2 min-w-0">
@@ -33,7 +38,7 @@
           </svg>
         </div>
         <div class="flex items-center shrink-0">
-          <svg class="h-6 w-28" viewBox="0 0 140 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg class="h-6 w-24" viewBox="0 0 120 32" fill="none" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="ohakoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stop-color="#818CF8" />
@@ -42,7 +47,6 @@
               </linearGradient>
             </defs>
             <text x="0" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="900" letter-spacing="3.5" fill="url(#ohakoGrad)">OHAKO</text>
-            <circle cx="126" cy="10" r="2.5" fill="#38BDF8" />
           </svg>
         </div>
       </div>
@@ -380,7 +384,7 @@
     </div>
   </div>
 
-  <!-- ==================== 私の十八番名刺モーダル (z-[60]に昇格) ==================== -->
+  <!-- ==================== 私の十八番名刺モーダル ==================== -->
   <div id="cardShareModal" class="fixed inset-0 z-[60] bg-black/80 hidden flex items-center justify-center p-3 overflow-y-auto">
     <div class="bg-slate-900 border border-slate-800 w-full max-w-md max-h-[92vh] flex flex-col rounded-2xl p-4 shadow-2xl my-auto space-y-3">
       <div class="flex items-center justify-between border-b border-slate-800 pb-2 shrink-0">
@@ -461,56 +465,57 @@
   <!-- ==================== ゲスト遮断：OHAKO紹介ウェルカム画面 ==================== -->
   <div id="cardWelcomeModal" class="fixed inset-0 z-[75] bg-slate-950 hidden overflow-y-auto p-4">
     <div class="max-w-md mx-auto space-y-5 my-auto py-8">
-      <!-- ロゴヘッダー -->
+      <!-- ロゴヘッダー (ドット削除・完全センター配置) -->
       <div class="text-center space-y-2">
         <div class="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 border border-indigo-400/30">
           <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
           </svg>
         </div>
-        <svg class="h-8 w-36 mx-auto" viewBox="0 0 140 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="ohakoGradWelcome" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#818CF8" />
-              <stop offset="50%" stop-color="#C084FC" />
-              <stop offset="100%" stop-color="#F472B6" />
-            </linearGradient>
-          </defs>
-          <text x="0" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="900" letter-spacing="3.5" fill="url(#ohakoGradWelcome)">OHAKO</text>
-          <circle cx="126" cy="10" r="2.5" fill="#38BDF8" />
-        </svg>
+        <div class="flex justify-center">
+          <svg class="h-8 w-32" viewBox="0 0 120 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="ohakoGradWelcome" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#818CF8" />
+                <stop offset="50%" stop-color="#C084FC" />
+                <stop offset="100%" stop-color="#F472B6" />
+              </linearGradient>
+            </defs>
+            <text x="0" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="900" letter-spacing="3.5" fill="url(#ohakoGradWelcome)">OHAKO</text>
+          </svg>
+        </div>
       </div>
 
-      <!-- プロダクトステートメント全文掲出 -->
+      <!-- プロダクトステートメント全文掲出（改行位置・文脈保護） -->
       <div class="bg-indigo-950/40 border border-indigo-900/60 p-4 rounded-2xl text-center space-y-2">
-        <p class="text-xs text-indigo-200 font-semibold leading-relaxed">
+        <p class="text-xs text-indigo-200 font-semibold leading-relaxed statement-text">
           自分の声を、誰よりも熟知している相棒と。<br>
-          出会う楽しみも、歌う歓びも、もっと自由に、もっと自分らしく。<br>
-          あなたの「十八番（OHAKO）」をともに紡ぐ、スマート・レパートリーパートナー。
+          出会う楽しみも、歌う歓びも、<br class="hidden sm:inline">もっと自由に、もっと自分らしく。<br>
+          あなたの「十八番（OHAKO）」をともに紡ぐ、<br class="hidden sm:inline">スマート・レパートリーパートナー。
         </p>
       </div>
 
-      <!-- 3フェーズ支援の紹介 -->
-      <div class="space-y-2 text-xs">
+      <!-- 3フェーズ支援の紹介（ユーザー視点コピーへ刷新） -->
+      <div class="space-y-2.5 text-xs">
         <div class="bg-slate-900/90 border border-slate-800 p-3 rounded-xl flex items-start gap-2.5">
           <span class="text-base">🎯</span>
           <div>
-            <div class="font-bold text-white">行く前：持ち曲と音域を一元管理</div>
-            <div class="text-[11px] text-slate-400 mt-0.5">キー設定・最高音・習熟度を整理し、iTunes試聴と連携してレパートリーを開拓。</div>
+            <div class="font-bold text-white">何を歌うか迷わない、最高のレパートリー作り</div>
+            <div class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">「あのアニソン原曲キーだっけ？」「次何歌おう…」の迷いをゼロに。自分の声に合う十八番をストック。</div>
           </div>
         </div>
         <div class="bg-slate-900/90 border border-slate-800 p-3 rounded-xl flex items-start gap-2.5">
           <span class="text-base">🎤</span>
           <div>
-            <div class="font-bold text-white">歌う現場：ピックアップ & 空気読み選曲</div>
-            <div class="text-[11px] text-slate-400 mt-0.5">本日の歌唱リスト管理と、部屋の盛り上がりに即応した次の一手を提案。</div>
+            <div class="font-bold text-white">部屋の空気を掴む、スマート選曲</div>
+            <div class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">盛り上がり・バラード・懐メロ…その場の流れに合わせたベストな一手を、専属マネージャーのように即提案。</div>
           </div>
         </div>
         <div class="bg-slate-900/90 border border-slate-800 p-3 rounded-xl flex items-start gap-2.5">
           <span class="text-base">📊</span>
           <div>
-            <div class="font-bold text-white">歌った後：客観データ診断 & AI総括</div>
-            <div class="text-[11px] text-slate-400 mt-0.5">実戦ボイスレンジや年代別戦力を可視化。相棒による愛ある辛口レビューを生成。</div>
+            <div class="font-bold text-white">歌った余韻を味わう、AI相棒の辛口講評</div>
+            <div class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">最高到達点やキー調整の勝率を客観分析。愛ある総括レポートで次回のカラオケがもっと楽しみに。</div>
           </div>
         </div>
       </div>
@@ -521,7 +526,7 @@
           📇 名刺をもう一度見る
         </button>
         <button onclick="startMyOwnOhako()" class="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white py-3 rounded-xl font-bold text-xs shadow-lg transition">
-          🚀 自分もOHAKOをはじめる
+          🚀 自分もOHAKOをはじめる（お試し体験）
         </button>
       </div>
 
@@ -645,6 +650,18 @@
         <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-white text-sm p-1">✕</button>
       </div>
 
+      <!-- 最上部：ご利用ガイドへの導線 -->
+      <button onclick="openGuideModal()" class="w-full bg-gradient-to-r from-indigo-950 to-slate-900 hover:from-indigo-900 hover:to-slate-800 border border-indigo-700/70 p-3 rounded-xl text-left flex items-center justify-between shadow-md transition group">
+        <div class="flex items-center gap-2.5">
+          <span class="text-xl">📖</span>
+          <div>
+            <div class="text-xs font-bold text-indigo-200 group-hover:text-white">ご利用ガイド・指標の見方</div>
+            <div class="text-[10px] text-slate-400">分析ロジックや各機能のポイントを確認</div>
+          </div>
+        </div>
+        <span class="text-xs text-indigo-400 font-bold group-hover:translate-x-0.5 transition-transform">➔</span>
+      </button>
+
       <!-- Gemini API連携設定 -->
       <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-2">
         <span class="text-xs font-bold text-indigo-400">✨ Gemini API 設定（空気読み・総括）</span>
@@ -702,7 +719,7 @@
       <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-2">
         <span class="text-xs font-bold text-slate-200">💾 データの保護 & バックアップ</span>
         <p class="text-[11px] text-slate-400 leading-relaxed">
-          Firestoreの全登録データをJSONファイルとしてダウンロード保存、または復元します。
+          全登録データをJSONファイルとしてダウンロード保存、または復元します。
         </p>
         <div class="grid grid-cols-2 gap-2 pt-1">
           <button onclick="exportBackupJSON()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 py-2 rounded-lg text-xs font-medium border border-slate-700 flex items-center justify-center gap-1">
@@ -726,6 +743,151 @@
       </div>
 
       <button type="button" onclick="closeSettingsModal()" class="w-full bg-slate-800 text-slate-300 py-2 rounded-lg text-xs font-bold">
+        閉じる
+      </button>
+    </div>
+  </div>
+
+  <!-- ==================== 📖 ご利用ガイド・専用モーダル ==================== -->
+  <div id="guideModal" class="fixed inset-0 z-[65] bg-black/85 hidden flex items-center justify-center p-3 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-md max-h-[92vh] flex flex-col rounded-2xl p-4 shadow-2xl my-auto space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2.5 shrink-0">
+        <div class="flex items-center gap-1.5">
+          <span class="text-base">📖</span>
+          <h2 class="text-sm font-bold text-white">OHAKO ご利用ガイド</h2>
+        </div>
+        <button onclick="closeGuideModal()" class="text-slate-400 hover:text-white text-sm p-1">✕</button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto no-scrollbar space-y-4 text-xs pr-1">
+        <!-- 1. はじめに（初期設定 & 準備） -->
+        <div class="space-y-2">
+          <div class="text-[11px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1">
+            <span>🔑</span>
+            <span>1. はじめに（初期設定 & 準備）</span>
+          </div>
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2 leading-relaxed text-slate-300">
+            <div>
+              <strong class="text-white block">・Firebase設定（必須）:</strong>
+              <span class="text-[11px] text-slate-400">持ち曲や歌唱履歴をご自身のクラウド上に安全に保存・同期するための設定です（<code>firebase-config.js</code> に記述）。</span>
+            </div>
+            <div>
+              <strong class="text-white block">・Gemini API設定（任意・推奨）:</strong>
+              <span class="text-[11px] text-slate-400">「💡 空気読み選曲」や「🤖 勝手にカラオケ総括」で、高度なAI相棒による本格的な選曲提案・レビュー機能を利用するために設定します（⚙️設定画面で登録）。</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. レパートリー登録の重要項目 -->
+        <div class="space-y-2">
+          <div class="text-[11px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1">
+            <span>🎯</span>
+            <span>2. 登録しておくべき重要項目</span>
+          </div>
+          <p class="text-[11px] text-slate-400 leading-relaxed">
+            以下の項目を登録・記録しておくことで、マイ分析の診断精度が劇的に向上し、AI相棒の提案が真価を発揮します。
+          </p>
+          <div class="space-y-1.5">
+            <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 space-y-1">
+              <strong class="text-indigo-300 font-bold">・キー設定</strong>
+              <p class="text-[11px] text-slate-400 leading-relaxed">原曲キー（0）だけでなく、「-2」「+1」など声に合わせた設定を記録。現場での迷いを無くすほか、「マイ分析」でキー調整による得点改善効果の算出に使われます。</p>
+            </div>
+            <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 space-y-1">
+              <strong class="text-indigo-300 font-bold">・習熟度（得意 / 歌える / 練習中 / これから）</strong>
+              <p class="text-[11px] text-slate-400 leading-relaxed">「得意」はボイスレンジ安全圏の判定や名刺の鉄板枠に、「歌える」以上は空気読み選曲の優先候補や本日の十八番度算出に直結します。</p>
+            </div>
+            <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 space-y-1">
+              <strong class="text-indigo-300 font-bold">・音域（最高音・最低音）</strong>
+              <p class="text-[11px] text-slate-400 leading-relaxed">曲の最高音（例: hiA, mid2G）を記録。「マイ・ボイスレンジ診断」の算出や「カラオケ総括」での最高到達点・オアシス曲の特定に不可欠です（⚙️設定のAI一括登録を活用可能）。</p>
+            </div>
+            <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 space-y-1">
+              <strong class="text-indigo-300 font-bold">・🎤 歌った（歌唱記録 & 回数）</strong>
+              <p class="text-[11px] text-slate-400 leading-relaxed">歌唱後に押すことで日時と回数がカウントされます。「最多歌唱」「マンネリ度」「ご無沙汰アラート」「カラオケ総括」の全ての基礎データとなります。</p>
+            </div>
+            <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 space-y-1">
+              <strong class="text-indigo-300 font-bold">・🎯 自己ベスト点数</strong>
+              <p class="text-[11px] text-slate-400 leading-relaxed">精密採点等のハイスコアを記録。「マイ分析」での平均スコアやアーティスト相性度の算出に活用されます。</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. メイン機能の使い方・見方 -->
+        <div class="space-y-2">
+          <div class="text-[11px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1">
+            <span>✨</span>
+            <span>3. 各機能の使い方 & 指標の見方</span>
+          </div>
+          <div class="space-y-2">
+            <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 space-y-1.5">
+              <strong class="text-white block font-bold">⭐ ピックアップ</strong>
+              <p class="text-[11px] text-slate-400 leading-relaxed">
+                カラオケ当日に「今日歌いたい曲の候補」を一時的にキープしておくスペースです（当日のセットリスト検討）。演奏時間を自動合算して「合計所要時間」を表示し、ワンタップでクリップボードへコピー可能。「歌った!」を押すと履歴に記録されリストから消化されます。
+              </p>
+            </div>
+
+            <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 space-y-1.5">
+              <strong class="text-white block font-bold">✨ 名曲発掘</strong>
+              <p class="text-[11px] text-slate-400 leading-relaxed">
+                登録済みの持ち曲を自動分析し、よく歌う歌手の「まだ登録していない名曲」や、同系統の関連アーティスト、同年代のタイアップ曲などを連想して自動リコメンドします。
+              </p>
+            </div>
+
+            <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 space-y-1.5">
+              <strong class="text-white block font-bold">💡 空気読み選曲</strong>
+              <p class="text-[11px] text-slate-400 leading-relaxed">
+                直前の部屋の流れ（盛り上がり・バラード・アニソン等）に合わせて、持ち曲からベストな3候補を提案します。
+              </p>
+              <ul class="text-[11px] text-slate-400 space-y-1 pl-2">
+                <li>• <strong class="text-indigo-300">王道追随枠</strong>: 今の空気を崩さず、確実にハマる曲。</li>
+                <li>• <strong class="text-indigo-300">空気転換枠</strong>: 良い塩梅でテンポを変え、場にメリハリをつける曲。</li>
+                <li>• <strong class="text-indigo-300">スパイス枠</strong>: 意表を突く変化球として、フロアを唸らせる隠し球。</li>
+              </ul>
+            </div>
+
+            <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 space-y-1.5">
+              <strong class="text-white block font-bold">📊 マイ分析ダッシュボード</strong>
+              <ul class="text-[11px] text-slate-400 space-y-1.5 pl-2">
+                <li>• <strong class="text-indigo-300">🎤 マイ・ボイスレンジ診断</strong>: 「得意」な曲の最高音を「鉄板最高音（安全圏）」とし、登録曲全体の最高音を「限界ボーダーライン（キー調整推奨）」として算出。</li>
+                <li>• <strong class="text-indigo-300">📅 年代別実戦力ポートフォリオ</strong>: 曲数だけでなく、習熟度（得意=1.0、歌える=0.7等）で重み付けした実戦投入可能ゲージ。</li>
+                <li>• <strong class="text-indigo-300">🎯 キー調整とスコア相関</strong>: 原曲キーとキー調整曲の平均点を比較し、キー変更によるスコア改善効果を表示。</li>
+                <li>• <strong class="text-indigo-300">💖 アーティスト偏愛・相性度</strong>: 持ち曲が多い歌手（最多登録）と、平均点が高い歌手（相性最高）を表示。</li>
+                <li>• <strong class="text-indigo-300">🔄 マンネリ度 & ご無沙汰アラート</strong>: 上位5曲の歌唱占有率（60%以上で固定化警告）と、3ヶ月以上未歌唱の十八番を抽出。</li>
+              </ul>
+            </div>
+
+            <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 space-y-1.5">
+              <strong class="text-white block font-bold">🤖 勝手にカラオケ総括・評論</strong>
+              <p class="text-[11px] text-slate-400 leading-relaxed">
+                指定日の朝6:00から翌朝6:00までの歌唱履歴を1セッションとして集計。最高到達点、喉のオアシス曲、十八番度を算出し、AI相棒が曲順ストーリーや喉の配分を鋭くユーモラスに講評します。
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. メンテナンス支援 -->
+        <div class="space-y-2">
+          <div class="text-[11px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1">
+            <span>⚙️</span>
+            <span>4. データ登録・メンテナンス支援</span>
+          </div>
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2 text-[11px] text-slate-400 leading-relaxed">
+            <div>
+              <strong class="text-white block">・📋 まとめて一括登録（追加画面）:</strong>
+              メモ帳等の曲名リストを貼り付けるだけで、iTunesから一括検索してプレビュー確認・保存できます。
+            </div>
+            <div>
+              <strong class="text-white block">・🤖 AIで音域を一括登録（設定画面）:</strong>
+              音域未設定の曲を抽出し、外部AI用の調査プロンプトを発行。回答JSONを貼り付けて一括反映できます。
+            </div>
+            <div>
+              <strong class="text-white block">・⚡ 未設定項目の一括自動補完（設定画面）:</strong>
+              ジャケット画像や試聴URLが空の曲を自動検出し、iTunesから一括アップデートします。
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button type="button" onclick="closeGuideModal()" class="w-full bg-slate-800 text-slate-300 py-2.5 rounded-xl text-xs font-bold shrink-0">
         閉じる
       </button>
     </div>
