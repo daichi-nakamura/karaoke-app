@@ -11,6 +11,14 @@
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     .bottom-sheet { transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
     .touch-none { touch-action: none; }
+    .dragging-card {
+      opacity: 0.92;
+      transform: scale(1.03);
+      box-shadow: 0 20px 25px -5px rgba(99, 102, 241, 0.3), 0 8px 10px -6px rgba(99, 102, 241, 0.3);
+      border-color: #6366f1 !important;
+      z-index: 50;
+      position: relative;
+    }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen pb-32 font-sans select-none">
@@ -52,7 +60,7 @@
       </div>
     </div>
 
-    <!-- 4分割メインナビゲーション (🔥 流行曲 に短縮し見切れ解消) -->
+    <!-- 4分割メインナビゲーション -->
     <div class="max-w-md mx-auto grid grid-cols-4 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
       <button id="navTabMyList" onclick="switchMainTab('mylist')" class="py-1.5 rounded-lg font-bold transition bg-indigo-600 text-white shadow text-center truncate">
         マイリスト
@@ -73,7 +81,7 @@
   <main id="viewMyList" class="max-w-md mx-auto p-4 space-y-2.5">
     <div id="statusBanner" class="hidden text-xs p-2.5 rounded-xl border"></div>
 
-    <!-- 上部操作バー: 1行目右揃え(空気読み/サイコロ) -> 2行目(検索/絞り込み) -> 3行目(チップ) -->
+    <!-- 上部操作バー -->
     <div class="space-y-2">
       <!-- 1行目: 右揃えボタン群 -->
       <div class="flex items-center justify-end gap-1.5">
@@ -83,7 +91,7 @@
         <button onclick="pickRandom()" class="bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl text-sm hover:bg-slate-800 transition" title="ランダム選曲">🎲</button>
       </div>
 
-      <!-- 2行目: 検索入力（凡例改善） ＋ 絞り込みボタン -->
+      <!-- 2行目: 検索入力 ＋ 絞り込みボタン -->
       <div class="flex gap-2">
         <input type="text" id="searchInput" oninput="render()" placeholder="曲名・歌手・タグ・メモで検索..." class="flex-1 min-w-0 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm placeholder:text-slate-500 text-slate-100 focus:outline-none focus:border-indigo-500">
         <button onclick="openFilterSheet()" class="bg-slate-900 hover:bg-slate-800 border border-slate-800 px-3 py-2.5 rounded-xl text-xs font-bold text-indigo-300 flex items-center gap-1.5 transition shrink-0">
@@ -92,7 +100,7 @@
         </button>
       </div>
 
-      <!-- 3行目: 適用中の条件チップ (絞り込みの直下) -->
+      <!-- 3行目: 適用中の条件チップ -->
       <div id="activeFilterChipsContainer" class="flex flex-wrap items-center gap-1.5 text-xs min-h-[20px]"></div>
     </div>
 
@@ -343,7 +351,7 @@
       <!-- 結果・スタッツ表示エリア (曲リストの上部に配置してスクロール不要化) -->
       <div id="summaryResultArea" class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2 text-xs overflow-y-auto no-scrollbar max-h-56 hidden shrink-0"></div>
 
-      <!-- 対象曲リスト (スワイプ/ドラッグ対応 & 曲追加ボタン) -->
+      <!-- 対象曲リスト (ハンバーガーアイコン専用ドラッグ対応 & 曲追加ボタン) -->
       <div class="flex-1 flex flex-col min-h-0 space-y-2">
         <div class="flex items-center justify-between text-[11px] text-slate-400 px-0.5 shrink-0">
           <span id="summarySongCount">0曲 歌唱</span>
@@ -351,7 +359,7 @@
             <button type="button" onclick="openAddSummarySongPicker()" class="text-indigo-400 hover:text-indigo-300 font-bold bg-slate-800 border border-slate-700 px-2 py-0.5 rounded text-[10px]">
               ＋ 曲を追加
             </button>
-            <span class="text-[10px] text-slate-500">ドラッグで並び替え</span>
+            <span class="text-[10px] text-slate-500">☰長押しでスワイプ並び替え</span>
           </div>
         </div>
         <div id="summarySongList" class="flex-1 overflow-y-auto no-scrollbar space-y-1.5 min-h-0 pr-0.5"></div>
@@ -447,6 +455,79 @@
       </div>
 
       <div id="cardViewList" class="space-y-2"></div>
+    </div>
+  </div>
+
+  <!-- ==================== ゲスト遮断：OHAKO紹介ウェルカム画面 ==================== -->
+  <div id="cardWelcomeModal" class="fixed inset-0 z-[75] bg-slate-950 hidden overflow-y-auto p-4">
+    <div class="max-w-md mx-auto space-y-5 my-auto py-8">
+      <!-- ロゴヘッダー -->
+      <div class="text-center space-y-2">
+        <div class="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 border border-indigo-400/30">
+          <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+          </svg>
+        </div>
+        <svg class="h-8 w-36 mx-auto" viewBox="0 0 140 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="ohakoGradWelcome" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#818CF8" />
+              <stop offset="50%" stop-color="#C084FC" />
+              <stop offset="100%" stop-color="#F472B6" />
+            </linearGradient>
+          </defs>
+          <text x="0" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="900" letter-spacing="3.5" fill="url(#ohakoGradWelcome)">OHAKO</text>
+          <circle cx="126" cy="10" r="2.5" fill="#38BDF8" />
+        </svg>
+      </div>
+
+      <!-- プロダクトステートメント全文掲出 -->
+      <div class="bg-indigo-950/40 border border-indigo-900/60 p-4 rounded-2xl text-center space-y-2">
+        <p class="text-xs text-indigo-200 font-semibold leading-relaxed">
+          自分の声を、誰よりも熟知している相棒と。<br>
+          出会う楽しみも、歌う歓びも、もっと自由に、もっと自分らしく。<br>
+          あなたの「十八番（OHAKO）」をともに紡ぐ、スマート・レパートリーパートナー。
+        </p>
+      </div>
+
+      <!-- 3フェーズ支援の紹介 -->
+      <div class="space-y-2 text-xs">
+        <div class="bg-slate-900/90 border border-slate-800 p-3 rounded-xl flex items-start gap-2.5">
+          <span class="text-base">🎯</span>
+          <div>
+            <div class="font-bold text-white">行く前：持ち曲と音域を一元管理</div>
+            <div class="text-[11px] text-slate-400 mt-0.5">キー設定・最高音・習熟度を整理し、iTunes試聴と連携してレパートリーを開拓。</div>
+          </div>
+        </div>
+        <div class="bg-slate-900/90 border border-slate-800 p-3 rounded-xl flex items-start gap-2.5">
+          <span class="text-base">🎤</span>
+          <div>
+            <div class="font-bold text-white">歌う現場：ピックアップ & 空気読み選曲</div>
+            <div class="text-[11px] text-slate-400 mt-0.5">本日の歌唱リスト管理と、部屋の盛り上がりに即応した次の一手を提案。</div>
+          </div>
+        </div>
+        <div class="bg-slate-900/90 border border-slate-800 p-3 rounded-xl flex items-start gap-2.5">
+          <span class="text-base">📊</span>
+          <div>
+            <div class="font-bold text-white">歌った後：客観データ診断 & AI総括</div>
+            <div class="text-[11px] text-slate-400 mt-0.5">実戦ボイスレンジや年代別戦力を可視化。相棒による愛ある辛口レビューを生成。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- アクション動線 -->
+      <div class="space-y-2 pt-2">
+        <button onclick="reopenSharedCard()" class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-indigo-300 py-3 rounded-xl font-bold text-xs transition">
+          📇 名刺をもう一度見る
+        </button>
+        <button onclick="startMyOwnOhako()" class="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white py-3 rounded-xl font-bold text-xs shadow-lg transition">
+          🚀 自分もOHAKOをはじめる
+        </button>
+      </div>
+
+      <div class="text-center text-[10px] text-slate-500">
+        インストール不要 • ホーム画面に追加して使えるPWA
+      </div>
     </div>
   </div>
 
@@ -568,7 +649,7 @@
       <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-2">
         <span class="text-xs font-bold text-indigo-400">✨ Gemini API 設定（空気読み・総括）</span>
         <p class="text-[11px] text-slate-400 leading-relaxed">
-          Google AI StudioのAPIキーを入力すると、空気読み選曲とカラオケ総括で本格AI相棒が利用可能になります。
+          Google AI StudioのAPIキーを入力すると、空気読み選曲とカラオケ総括で本格AI相棒（Gemini 3.5 Flash）が利用可能になります。
         </p>
         <div class="flex gap-1.5 pt-1">
           <input type="password" id="geminiApiKeyInput" placeholder="AIzaSy..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none">
