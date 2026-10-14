@@ -21,6 +21,9 @@ let currentAudio = null;
 let currentPlayingId = null;
 let undoHistory = {};
 
+// デモモードフラグ
+let isDemoMode = localStorage.getItem('ohako_is_demo_mode') === 'true';
+
 // 空気読みセッション用
 let currentMoodFlow = [];
 let activeMoodAttrs = new Set();
@@ -43,7 +46,7 @@ const ARTIST_RELATIONS = {
   'mr.children': ['スピッツ', 'コブクロ', 'ゆず', 'サザンオールスターズ']
 };
 
-// 主要アーティストのエイリアス（略称・かな対応）拡充辞書
+// 主要アーティストのエイリアス拡充辞書
 const ARTIST_ALIASES = {
   'king gnu': ['キングヌー', 'きんぐぬー', 'きんぐ', 'kinggnu'],
   'official髭男dism': ['ヒゲダン', 'ひげだん', 'ひげだんでぃずむ', '髭男', 'ひげ'],
@@ -230,6 +233,7 @@ function lockBodyScroll(lock) {
   } else {
     const hasOpenModal = !document.getElementById('modal').classList.contains('hidden') ||
                          !document.getElementById('settingsModal').classList.contains('hidden') ||
+                         !document.getElementById('guideModal').classList.contains('hidden') ||
                          !document.getElementById('artistModal').classList.contains('hidden') ||
                          !document.getElementById('moodModal').classList.contains('hidden') ||
                          !document.getElementById('summaryModal').classList.contains('hidden') ||
@@ -242,6 +246,93 @@ function lockBodyScroll(lock) {
       document.body.classList.remove('overflow-hidden');
     }
   }
+}
+
+// ==========================================
+// デモモード（ローカル保存）用ハンドラ
+// ==========================================
+function saveLocalDemoSongs() {
+  localStorage.setItem('ohako_demo_songs', JSON.stringify(window.songs));
+}
+
+function loadLocalDemoSongs() {
+  const saved = localStorage.getItem('ohako_demo_songs');
+  if (saved) {
+    try {
+      window.songs = JSON.parse(saved);
+      return;
+    } catch (e) {}
+  }
+  // パターンB: J-Pop定番の初期プリセット
+  window.songs = [
+    {
+      id: "demo_1",
+      title: "怪獣の花唄",
+      artist: "Vaundy",
+      year: "2020",
+      genre: "J-Pop",
+      maxPitch: "hiA",
+      minPitch: "mid1C",
+      artwork: "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/bf/a4/0f/bfa40f42-498c-03d5-e2a2-3f191a27e7eb/source/100x100bb.jpg",
+      previewUrl: "",
+      duration: "3:45",
+      durationMs: 225000,
+      key: "0",
+      score: "得意",
+      scoreVal: 93.4,
+      duetType: "solo",
+      tags: ["2020年代", "盛り上がる", "ロック"],
+      memo: "サビのブレスをしっかり。後半キー上がりに注意。",
+      singCount: 5,
+      lastSungAt: Date.now() - 3600000,
+      createdAt: Date.now() - 86400000
+    },
+    {
+      id: "demo_2",
+      title: "Lemon",
+      artist: "米津玄師",
+      year: "2018",
+      genre: "J-Pop",
+      maxPitch: "mid2G#",
+      minPitch: "lowG#",
+      artwork: "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/4a/01/2d/4a012d90-8e10-9173-9ea8-c51cae82b79e/source/100x100bb.jpg",
+      previewUrl: "",
+      duration: "4:15",
+      durationMs: 255000,
+      key: "0",
+      score: "歌える",
+      scoreVal: 89.2,
+      duetType: "solo",
+      tags: ["2010年代", "バラード", "ドラマ主題歌"],
+      memo: "出だし低音を響かせる。感情を込めて。",
+      singCount: 3,
+      lastSungAt: Date.now() - 7200000,
+      createdAt: Date.now() - 86400000
+    },
+    {
+      id: "demo_3",
+      title: "マリーゴールド",
+      artist: "あいみょん",
+      year: "2018",
+      genre: "J-Pop",
+      maxPitch: "hiB",
+      minPitch: "mid1F#",
+      artwork: "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/05/cf/dc/05cfdc4b-231a-6419-f9c3-1dc083161c16/source/100x100bb.jpg",
+      previewUrl: "",
+      duration: "5:06",
+      durationMs: 306000,
+      key: "-2",
+      score: "得意",
+      scoreVal: 91.8,
+      duetType: "solo",
+      tags: ["2010年代", "定番", "エモい"],
+      memo: "-2で喉に負担なく気持ちよく歌える。",
+      singCount: 4,
+      lastSungAt: Date.now() - 10800000,
+      createdAt: Date.now() - 86400000
+    }
+  ];
+  saveLocalDemoSongs();
 }
 
 // ==========================================
@@ -578,7 +669,6 @@ window.removeBulkCandidate = function(idx) {
 };
 
 window.saveBulkSongs = async function() {
-  if (!window.firestoreOps) return alert("データベースに接続されていません。");
   const toSave = bulkCandidateSongs.filter(s => !s.isAlreadyAdded);
   if (toSave.length === 0) return alert("登録対象の曲がありません。");
 
@@ -589,7 +679,6 @@ window.saveBulkSongs = async function() {
   btnSave.classList.add('opacity-50');
   progressEl.classList.remove('hidden');
 
-  const { collection, addDoc } = window.firestoreOps;
   let count = 0;
   const now = Date.now();
 
@@ -598,7 +687,8 @@ window.saveBulkSongs = async function() {
       const s = toSave[i];
       progressEl.textContent = `⏳ 保存中 (${i + 1}/${toSave.length}): ${s.title}`;
 
-      await addDoc(collection(window.db, "songs"), {
+      const songObj = {
+        id: isDemoMode ? `demo_${now}_${i}` : undefined,
         title: s.title,
         artist: s.artist,
         year: s.year,
@@ -618,13 +708,23 @@ window.saveBulkSongs = async function() {
         singCount: 0,
         lastSungAt: null,
         createdAt: now + i
-      });
+      };
+
+      if (isDemoMode) {
+        window.songs.unshift(songObj);
+      } else if (window.firestoreOps) {
+        const { collection, addDoc } = window.firestoreOps;
+        await addDoc(collection(window.db, "songs"), songObj);
+      }
       count++;
       if (i % 5 === 0) await new Promise(r => setTimeout(r, 20));
     }
+
+    if (isDemoMode) saveLocalDemoSongs();
     alert(`🎉 ${count}曲を一括登録しました！`);
     window.isUserSorting = true;
     closeModal();
+    render();
   } catch (err) {
     alert(`保存中にエラーが発生しました: ${err.message}`);
   } finally {
@@ -635,7 +735,7 @@ window.saveBulkSongs = async function() {
 };
 
 // ==========================================
-// 設定 & AI音域連携
+// 設定 & AI音域連携 & ガイドモーダル
 // ==========================================
 window.openSettingsModal = function() {
   document.getElementById('migrateProgressText').classList.add('hidden');
@@ -649,6 +749,15 @@ window.openSettingsModal = function() {
 };
 window.closeSettingsModal = function() {
   document.getElementById('settingsModal').classList.add('hidden');
+  lockBodyScroll(false);
+};
+
+window.openGuideModal = function() {
+  document.getElementById('guideModal').classList.remove('hidden');
+  lockBodyScroll(true);
+};
+window.closeGuideModal = function() {
+  document.getElementById('guideModal').classList.add('hidden');
   lockBodyScroll(false);
 };
 
@@ -692,13 +801,9 @@ window.applyAiPitchJson = async function() {
     return alert("JSONの解析に失敗しました。正しいフォーマットか確認してください。");
   }
 
-  if (!window.firestoreOps) return alert("データベースに接続されていません。");
-
   btn.disabled = true;
   btn.classList.add('opacity-50');
   const originalText = btn.textContent;
-
-  const { doc, updateDoc } = window.firestoreOps;
   let count = 0;
 
   try {
@@ -706,18 +811,30 @@ window.applyAiPitchJson = async function() {
       const item = list[i];
       btn.textContent = `⏳ 反映中 (${i + 1}/${list.length}件)...`;
       if (item.id && (item.maxPitch || item.minPitch)) {
-        const patch = {};
-        if (item.maxPitch) patch.maxPitch = item.maxPitch;
-        if (item.minPitch) patch.minPitch = item.minPitch;
-        await updateDoc(doc(window.db, "songs", item.id), patch);
-        count++;
+        if (isDemoMode) {
+          const s = window.songs.find(x => x.id === item.id);
+          if (s) {
+            if (item.maxPitch) s.maxPitch = item.maxPitch;
+            if (item.minPitch) s.minPitch = item.minPitch;
+            count++;
+          }
+        } else if (window.firestoreOps) {
+          const { doc, updateDoc } = window.firestoreOps;
+          const patch = {};
+          if (item.maxPitch) patch.maxPitch = item.maxPitch;
+          if (item.minPitch) patch.minPitch = item.minPitch;
+          await updateDoc(doc(window.db, "songs", item.id), patch);
+          count++;
+        }
       }
       if (i % 5 === 0) await new Promise(r => setTimeout(r, 20));
     }
 
+    if (isDemoMode) saveLocalDemoSongs();
     alert(`🎉 ${count}件の音域データを反映しました！`);
     input.value = '';
     closeSettingsModal();
+    render();
   } catch (err) {
     alert(`反映中にエラーが発生しました: ${err.message}`);
   } finally {
@@ -728,20 +845,19 @@ window.applyAiPitchJson = async function() {
 };
 
 window.startDataMigration = async function() {
-  if (!window.firestoreOps || !window.songs || window.songs.length === 0) return alert("曲データが存在しません。");
+  if (!window.songs || window.songs.length === 0) return alert("曲データが存在しません。");
   const progressEl = document.getElementById('migrateProgressText');
   const btnEl = document.getElementById('btnMigrate');
   const targets = window.songs.filter(s => !s.artwork || !s.previewUrl || !s.durationMs || !s.year);
   
   if (targets.length === 0) return alert("✨ すべての曲データはすでに最新情報で補完されています！");
-  if (!confirm(`全${window.songs.length}曲中、未補完の曲が【${targets.length}曲】見つかりました。\niTunesから情報を自動取得してFirestoreを更新しますか？`)) return;
+  if (!confirm(`全${window.songs.length}曲中、未補完の曲が【${targets.length}曲】見つかりました。\niTunesから情報を自動取得して更新しますか？`)) return;
 
   btnEl.disabled = true;
   btnEl.classList.add('opacity-50');
   progressEl.classList.remove('hidden');
 
   let updatedCount = 0;
-  const { doc, updateDoc } = window.firestoreOps;
 
   for (let i = 0; i < targets.length; i++) {
     const s = targets[i];
@@ -764,7 +880,12 @@ window.startDataMigration = async function() {
         if (!s.duetType) patch.duetType = checkIsDuet(hit.trackName, hit.artistName) ? 'duet' : 'solo';
 
         if (Object.keys(patch).length > 0) {
-          await updateDoc(doc(window.db, "songs", s.id), patch);
+          if (isDemoMode) {
+            Object.assign(s, patch);
+          } else if (window.firestoreOps) {
+            const { doc, updateDoc } = window.firestoreOps;
+            await updateDoc(doc(window.db, "songs", s.id), patch);
+          }
           updatedCount++;
         }
       }
@@ -774,21 +895,46 @@ window.startDataMigration = async function() {
     await new Promise(r => setTimeout(r, 200));
   }
 
+  if (isDemoMode) saveLocalDemoSongs();
   btnEl.disabled = false;
   btnEl.classList.remove('opacity-50');
   progressEl.textContent = `🎉 完了！ ${updatedCount}曲のデータを最新に更新しました。`;
   alert(`補完が完了しました！\n更新された曲数: ${updatedCount}件`);
+  render();
 };
 
-window.exportBackupJSON = function() {
+window.exportBackupJSON = async function() {
   if (!window.songs || window.songs.length === 0) return alert("曲データがありません。");
-  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(window.songs, null, 2));
+  
+  const fileName = `karaoke_backup_${new Date().toISOString().split('T')[0]}.json`;
+  const jsonStr = JSON.stringify(window.songs, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+
+  // iOS Safari / PWA 向け Web Share API
+  if (navigator.canShare && navigator.canShare({ files: [new File([blob], fileName, { type: 'application/json' })] })) {
+    try {
+      const file = new File([blob], fileName, { type: 'application/json' });
+      await navigator.share({
+        files: [file],
+        title: 'OHAKO バックアップ'
+      });
+      return;
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+    }
+  }
+
+  // PC / Android Blob URL ダウンロード
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.setAttribute("href", dataStr);
-  a.setAttribute("download", `karaoke_backup_${new Date().toISOString().split('T')[0]}.json`);
+  a.href = url;
+  a.download = fileName;
   document.body.appendChild(a);
   a.click();
-  a.remove();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
 };
 
 window.importBackupJSON = function(e) {
@@ -801,16 +947,22 @@ window.importBackupJSON = function(e) {
       if (!Array.isArray(imported)) throw new Error("不正なデータ形式です。");
       if (!confirm(`バックアップファイルから ${imported.length} 曲を読み込みました。\n復元しますか？`)) return;
 
-      const { collection, addDoc } = window.firestoreOps;
-      let count = 0;
-      for (const s of imported) {
-        const { id, ...dataToSave } = s;
-        await addDoc(collection(window.db, "songs"), { ...dataToSave, createdAt: dataToSave.createdAt || Date.now() });
-        count++;
+      if (isDemoMode) {
+        window.songs = imported;
+        saveLocalDemoSongs();
+      } else if (window.firestoreOps) {
+        const { collection, addDoc } = window.firestoreOps;
+        let count = 0;
+        for (const s of imported) {
+          const { id, ...dataToSave } = s;
+          await addDoc(collection(window.db, "songs"), { ...dataToSave, createdAt: dataToSave.createdAt || Date.now() });
+          count++;
+        }
       }
-      alert(`🎉 ${count} 曲の復元が完了しました！`);
+      alert(`🎉 復元が完了しました！`);
       window.isUserSorting = true;
       closeSettingsModal();
+      render();
     } catch (err) {
       alert("読み込み失敗: " + err.message);
     }
@@ -823,14 +975,20 @@ window.resetAllSingHistory = async function() {
   if (!confirm("⚠️ 全曲の歌唱回数と歌唱履歴をリセットしますか？")) return;
   if (!confirm("本当に元に戻せませんがよろしいですか？")) return;
 
-  const { doc, updateDoc } = window.firestoreOps;
-  for (const s of window.songs) {
-    if (s.singCount || s.lastSungAt) {
-      await updateDoc(doc(window.db, "songs", s.id), { singCount: 0, lastSungAt: null });
+  if (isDemoMode) {
+    window.songs.forEach(s => { s.singCount = 0; s.lastSungAt = null; });
+    saveLocalDemoSongs();
+  } else if (window.firestoreOps) {
+    const { doc, updateDoc } = window.firestoreOps;
+    for (const s of window.songs) {
+      if (s.singCount || s.lastSungAt) {
+        await updateDoc(doc(window.db, "songs", s.id), { singCount: 0, lastSungAt: null });
+      }
     }
   }
   alert("全曲の歌唱カウンターをゼロにリセットしました。");
   closeSettingsModal();
+  render();
 };
 
 // ==========================================
@@ -917,7 +1075,6 @@ window.loadRanking = async function() {
   container.innerHTML = '<div class="text-center text-slate-500 py-12 text-sm">最新の人気曲を取得中...</div>';
 
   try {
-    // CORS制限や404の起きるRSSを完全廃止し、確実に200を返すJ-Pop人気曲検索（JSONPフォールバック内蔵）へ一本化
     const data = await fetchITunesApi("2025 2026 J-Pop ヒット", 50);
     const results = data.results || [];
     if (results.length === 0) throw new Error("ヒット曲リストが空でした");
@@ -1552,7 +1709,7 @@ function updateToggleAllExpandButtonState() {
   icon.textContent = isAllExpanded ? '📕' : '📖';
 }
 
-// 検索マッチング判定（かな・カナ・英字・略称辞書・曲名辞書）
+// 検索マッチング判定
 function matchSearchQuery(song, rawQuery) {
   if (!rawQuery) return true;
   const qLower = rawQuery.toLowerCase().trim();
@@ -1633,7 +1790,7 @@ function getCurrentFilteredSongs() {
 }
 
 // ==========================================
-// マイリスト描画（位置保持 & ピックアップ状態視覚同期）
+// マイリスト描画
 // ==========================================
 window.render = function() {
   const sortSelect = document.getElementById('sortSelect');
@@ -2106,18 +2263,23 @@ function renderAnalysis() {
 
 // 歌唱記録
 window.recordSung = async function(id) {
-  if (!window.firestoreOps) return;
   const target = (window.songs || []).find(s => s.id === id);
   if (!target) return;
 
   undoHistory[id] = { lastSungAt: target.lastSungAt || null, singCount: target.singCount || 0 };
+  target.lastSungAt = Date.now();
+  target.singCount = (target.singCount || 0) + 1;
   render();
 
-  const { doc, updateDoc } = window.firestoreOps;
-  await updateDoc(doc(window.db, "songs", id), { 
-    lastSungAt: Date.now(),
-    singCount: (target.singCount || 0) + 1
-  });
+  if (isDemoMode) {
+    saveLocalDemoSongs();
+  } else if (window.firestoreOps) {
+    const { doc, updateDoc } = window.firestoreOps;
+    await updateDoc(doc(window.db, "songs", id), { 
+      lastSungAt: target.lastSungAt,
+      singCount: target.singCount
+    });
+  }
 
   setTimeout(() => {
     if (undoHistory[id] !== undefined) {
@@ -2128,16 +2290,26 @@ window.recordSung = async function(id) {
 };
 
 window.undoSung = async function(id) {
-  if (!window.firestoreOps || undoHistory[id] === undefined) return;
+  if (undoHistory[id] === undefined) return;
   const prev = undoHistory[id];
   delete undoHistory[id];
+
+  const target = (window.songs || []).find(s => s.id === id);
+  if (target) {
+    target.lastSungAt = prev.lastSungAt;
+    target.singCount = prev.singCount;
+  }
   render();
 
-  const { doc, updateDoc } = window.firestoreOps;
-  await updateDoc(doc(window.db, "songs", id), { 
-    lastSungAt: prev.lastSungAt,
-    singCount: prev.singCount
-  });
+  if (isDemoMode) {
+    saveLocalDemoSongs();
+  } else if (window.firestoreOps) {
+    const { doc, updateDoc } = window.firestoreOps;
+    await updateDoc(doc(window.db, "songs", id), { 
+      lastSungAt: prev.lastSungAt,
+      singCount: prev.singCount
+    });
+  }
 };
 
 function resetModalInputs() {
@@ -2225,8 +2397,6 @@ window.closeModal = function() {
 
 window.handleSave = async function(e) {
   e.preventDefault();
-  if (!window.firestoreOps) return alert("データベースに接続されていません。");
-
   const editId = document.getElementById('editSongId').value;
   const tags = document.getElementById('formTags').value
     .split(/[\s,、]+/)
@@ -2254,27 +2424,50 @@ window.handleSave = async function(e) {
     lastSungAt: document.getElementById('formLastSungAt').value ? Number(document.getElementById('formLastSungAt').value) : null
   };
 
-  const { collection, addDoc, doc, updateDoc } = window.firestoreOps;
-  if (editId) {
-    await updateDoc(doc(window.db, "songs", editId), songData);
-  } else {
-    await addDoc(collection(window.db, "songs"), {
-      ...songData,
-      createdAt: Date.now(),
-      singCount: 0,
-      lastSungAt: null
-    });
+  if (isDemoMode) {
+    if (editId) {
+      const idx = window.songs.findIndex(s => s.id === editId);
+      if (idx !== -1) window.songs[idx] = { ...window.songs[idx], ...songData };
+    } else {
+      window.songs.unshift({
+        id: `demo_${Date.now()}`,
+        ...songData,
+        createdAt: Date.now(),
+        singCount: 0,
+        lastSungAt: null
+      });
+    }
+    saveLocalDemoSongs();
+  } else if (window.firestoreOps) {
+    const { collection, addDoc, doc, updateDoc } = window.firestoreOps;
+    if (editId) {
+      await updateDoc(doc(window.db, "songs", editId), songData);
+    } else {
+      await addDoc(collection(window.db, "songs"), {
+        ...songData,
+        createdAt: Date.now(),
+        singCount: 0,
+        lastSungAt: null
+      });
+    }
   }
+
   window.isUserSorting = true;
   closeModal();
+  render();
 };
 
 window.deleteSong = async function(id) {
   if (confirm('この曲を削除しますか？')) {
-    if (!window.firestoreOps) return;
     removeFromSetlist(id);
-    const { doc, deleteDoc } = window.firestoreOps;
-    await deleteDoc(doc(window.db, "songs", id));
+    if (isDemoMode) {
+      window.songs = window.songs.filter(s => s.id !== id);
+      saveLocalDemoSongs();
+      render();
+    } else if (window.firestoreOps) {
+      const { doc, deleteDoc } = window.firestoreOps;
+      await deleteDoc(doc(window.db, "songs", id));
+    }
   }
 };
 
@@ -2296,7 +2489,7 @@ window.closeRandom = function() {
 };
 
 // ==========================================
-// 💡 空気読み選曲機能（モデル順次リトライ連鎖）
+// 💡 空気読み選曲機能（404解消・モデル順次リトライ連鎖）
 // ==========================================
 window.openMoodSuggestModal = function() {
   currentMoodFlow = [];
@@ -2411,7 +2604,6 @@ ${songListText}
   { "id": "曲のid", "category": "スパイス枠", "comment": "相棒コメント（70〜100字程度）" }
 ]`;
 
-    // 将棋アプリで実績のあるモデル連鎖シーケンス
     const modelsSequence = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
     let success = false;
 
@@ -2423,9 +2615,7 @@ ${songListText}
           body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
 
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
 
         const data = await res.json();
         const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -2539,7 +2729,7 @@ function renderMoodResults(suggestions, errorMessage) {
 }
 
 // ==========================================
-// 🤖 勝手にカラオケ総括・評論（右端☰ / 左端✕ / 振動 / 浮き上がり）
+// 🤖 勝手にカラオケ総括・評論（UX改善版）
 // ==========================================
 window.openSummaryModal = function() {
   const todayStr = new Date().toISOString().split('T')[0];
@@ -2586,12 +2776,11 @@ function renderSummaryCandidateList() {
     return;
   }
 
-  // 左端に削除ボタン✕（誤操作防止）、右端にハンバーガー☰（右手親指操作で画面が隠れない）
   container.innerHTML = summaryCandidateSongs.map((s, idx) => `
     <div data-idx="${idx}" class="summary-drag-card flex items-center justify-between p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs gap-2 select-none transition-all duration-150">
       <div class="flex items-center gap-2 shrink-0">
         <button onclick="removeSummarySong(${idx})" class="text-slate-500 hover:text-rose-400 p-1 text-sm rounded bg-slate-900 border border-slate-800" title="リストから除外">✕</button>
-        <span class="font-mono text-indigo-400 font-bold w-4 text-center shrink-0">${idx + 1}</span>
+        <span class="card-rank font-mono text-indigo-400 font-bold w-4 text-center shrink-0">${idx + 1}</span>
       </div>
       <div class="min-w-0 flex-1 px-1">
         <div class="font-bold text-white truncate text-xs">${escapeHtml(s.title)}</div>
@@ -2606,22 +2795,32 @@ function renderSummaryCandidateList() {
   attachSummaryTouchDragListeners();
 }
 
-// 右端ハンバーガー限定 ＆ リアルタイム浮き上がり ＆ 触覚振動フィードバック
+// DOM再構築を行わず浮遊スタイルを維持したスムーズ並び替え
 function attachSummaryTouchDragListeners() {
-  const cards = document.querySelectorAll('.summary-drag-card');
+  const container = document.getElementById('summarySongList');
+  if (!container) return;
+
+  const cards = container.querySelectorAll('.summary-drag-card');
   let draggedCard = null;
   let draggedIdx = null;
+
+  function updateCardIndices() {
+    const currentCards = container.querySelectorAll('.summary-drag-card');
+    currentCards.forEach((c, i) => {
+      c.dataset.idx = i;
+      const rankEl = c.querySelector('.card-rank');
+      if (rankEl) rankEl.textContent = i + 1;
+    });
+  }
 
   cards.forEach(card => {
     const handle = card.querySelector('[data-handle="true"]');
     if (!handle) return;
 
-    // タッチ操作（スマホ）
-    handle.addEventListener('touchstart', (e) => {
+    handle.addEventListener('touchstart', () => {
       draggedCard = card;
       draggedIdx = parseInt(card.dataset.idx, 10);
       
-      // 浮き上がり強調スタイルを直接注入
       card.style.transform = 'scale(1.04) translateY(-3px)';
       card.style.boxShadow = '0 15px 25px -5px rgba(99, 102, 241, 0.4)';
       card.style.borderColor = '#818cf8';
@@ -2637,16 +2836,23 @@ function attachSummaryTouchDragListeners() {
       const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
       const targetCard = targetEl ? targetEl.closest('.summary-drag-card') : null;
 
-      if (targetCard && targetCard !== draggedCard) {
+      if (targetCard && targetCard !== draggedCard && container.contains(targetCard)) {
         const targetIdx = parseInt(targetCard.dataset.idx, 10);
         if (!isNaN(targetIdx) && targetIdx !== draggedIdx) {
-          // 入れ替わり時の触覚フィードバック（トッという短い振動）
-          if (navigator.vibrate) navigator.vibrate(15);
-
+          // 配列入れ替え
           const item = summaryCandidateSongs.splice(draggedIdx, 1)[0];
           summaryCandidateSongs.splice(targetIdx, 0, item);
+
+          // DOMの順序を直接変更（再描画せず浮上スタイルを維持）
+          if (targetIdx > draggedIdx) {
+            container.insertBefore(draggedCard, targetCard.nextSibling);
+          } else {
+            container.insertBefore(draggedCard, targetCard);
+          }
+
           draggedIdx = targetIdx;
-          renderSummaryCandidateList();
+          updateCardIndices();
+          if (navigator.vibrate) navigator.vibrate(15);
         }
       }
     }, { passive: true });
@@ -2666,13 +2872,14 @@ function attachSummaryTouchDragListeners() {
     handle.addEventListener('touchend', handleEnd);
     handle.addEventListener('touchcancel', handleEnd);
 
-    // マウス操作（PC用）
+    // PC マウス操作
     handle.addEventListener('mousedown', () => {
       card.setAttribute('draggable', 'true');
     });
 
     card.addEventListener('dragstart', (e) => {
       draggedIdx = parseInt(card.dataset.idx, 10);
+      draggedCard = card;
       card.style.transform = 'scale(1.04) translateY(-3px)';
       card.style.boxShadow = '0 15px 25px -5px rgba(99, 102, 241, 0.4)';
       card.style.borderColor = '#818cf8';
@@ -2684,11 +2891,18 @@ function attachSummaryTouchDragListeners() {
       e.preventDefault();
       const currentHoverIdx = parseInt(card.dataset.idx, 10);
       if (draggedIdx !== null && draggedIdx !== currentHoverIdx) {
-        if (navigator.vibrate) navigator.vibrate(15);
         const item = summaryCandidateSongs.splice(draggedIdx, 1)[0];
         summaryCandidateSongs.splice(currentHoverIdx, 0, item);
+
+        if (currentHoverIdx > draggedIdx) {
+          container.insertBefore(draggedCard, card.nextSibling);
+        } else {
+          container.insertBefore(draggedCard, card);
+        }
+
         draggedIdx = currentHoverIdx;
-        renderSummaryCandidateList();
+        updateCardIndices();
+        if (navigator.vibrate) navigator.vibrate(15);
       }
     });
 
@@ -2698,6 +2912,7 @@ function attachSummaryTouchDragListeners() {
       card.style.borderColor = '';
       card.style.zIndex = '';
       card.removeAttribute('draggable');
+      draggedCard = null;
       draggedIdx = null;
     });
   });
@@ -2820,9 +3035,9 @@ ${songRows}
 【講評執筆の要件】
 1. 単なる曲の羅列や褒め言葉に終始せず、曲順のストーリー性、喉の酷使ペース配分、キー調整のファインプレー（または原曲無茶）、選曲の情緒（アッパーとバラードの乱高下など）をプロのマネージャー視点で鋭く愛をもって突っ込んでください。
 2. ボリュームは読み応えのある600〜800字程度。
-3. 以下のフォーマットを必ず使用してください。
+3. 以下のフォーマットを必ず使用してください（「セトリ」という用語は絶対に使わないでください）。
 
-■ 本日のセトリ二つ名（称号）
+■ 本日の歌唱ドラマ二つ名（称号）
 （パンチのある尖った称号）
 
 ■ 相棒からの辛口＆情熱レビュー
@@ -2830,7 +3045,6 @@ ${songRows}
 
 ■ 本日のベストパフォーマンス賞 & 渇入れ（次回への課題）`;
 
-    // 将棋アプリで実績のあるモデル連鎖シーケンス
     const modelsSequence = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
     let success = false;
 
@@ -2877,7 +3091,7 @@ ${songRows}
     <div class="space-y-2 text-xs text-indigo-100 leading-relaxed">
       <div class="font-bold text-amber-400 text-sm">🏆 称号: 『喉酷使！意地と情熱のハイピッチ・ショウダウン』</div>
       <p>
-        全${summaryCandidateSongs.length}曲の熱唱、本当にお疲れ様でした！初手「${escapeHtml(titles[0] || '')}」で会場の空気を一気に掴んだ滑り出しは完璧でしたが、中盤以降のセットリストはまさにスリリング。最高到達点【${escapeHtml(stats.highest)}】への果敢なアタックは圧巻だった反面、喉のスタミナ配分を完全に度外視したパッション選曲に相棒としては冷や汗の連続でした。
+        全${summaryCandidateSongs.length}曲の熱唱、本当にお疲れ様でした！初手「${escapeHtml(titles[0] || '')}」で会場の空気を一気に掴んだ滑り出しは完璧でしたが、中盤以降の曲順構成はまさにスリリング。最高到達点【${escapeHtml(stats.highest)}】への果敢なアタックは圧巻だった反面、喉のスタミナ配分を完全に度外視したパッション選曲に相棒としては冷や汗の連続でした。
       </p>
       <p>
         十八番度は【${stats.ohakoDegree}】と高水準をマーク。オアシス曲【${escapeHtml(stats.oasis)}】を挟む冷静さがあったからこそ、最後まで歌声を保てたファインプレーと言えます。
@@ -2984,7 +3198,6 @@ function checkAndOpenSharedCard() {
 }
 
 function renderCardViewScreen(list) {
-  // 通常管理UIを完全ガード（ゲストモード化）
   const header = document.getElementById('appMainHeader');
   if (header) header.classList.add('hidden');
   const mylist = document.getElementById('viewMyList');
@@ -3023,7 +3236,6 @@ function renderCardViewScreen(list) {
   lockBodyScroll(true);
 }
 
-// ゲストが「閉じる」を押した際、通常管理画面ではなくOHAKO紹介画面へ遷移
 window.closeCardView = function() {
   document.getElementById('cardViewModal').classList.add('hidden');
   document.getElementById('cardWelcomeModal').classList.remove('hidden');
@@ -3037,7 +3249,11 @@ window.reopenSharedCard = function() {
   }
 };
 
+// ゲストが「自分もOHAKOをはじめる」を押した際のデモモード起動
 window.startMyOwnOhako = function() {
+  isDemoMode = true;
+  localStorage.setItem('ohako_is_demo_mode', 'true');
+
   document.getElementById('cardWelcomeModal').classList.add('hidden');
   document.getElementById('cardViewModal').classList.add('hidden');
   
@@ -3046,8 +3262,13 @@ window.startMyOwnOhako = function() {
   const mylist = document.getElementById('viewMyList');
   if (mylist) mylist.classList.remove('hidden');
 
+  const demoBanner = document.getElementById('demoModeBanner');
+  if (demoBanner) demoBanner.classList.remove('hidden');
+
   window.location.hash = '';
   lockBodyScroll(false);
+
+  loadLocalDemoSongs();
   render();
 };
 
@@ -3055,6 +3276,12 @@ window.startMyOwnOhako = function() {
 window.addEventListener('hashchange', checkAndOpenSharedCard);
 
 window.addEventListener('DOMContentLoaded', () => {
+  if (isDemoMode) {
+    const demoBanner = document.getElementById('demoModeBanner');
+    if (demoBanner) demoBanner.classList.remove('hidden');
+    loadLocalDemoSongs();
+    render();
+  }
   checkAndOpenSharedCard();
 });
 
