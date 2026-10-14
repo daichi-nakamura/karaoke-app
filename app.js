@@ -2,23 +2,11 @@
 // OHAKO - Main Application Logic
 // ==========================================
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { db } from "./firebase-config.js";
 import { 
-  getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch 
+  collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch 
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-// Firebase設定（プロジェクトの環境に合わせて適宜書き換えてください）
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
 const songsCol = collection(db, "songs");
 
 // グローバル状態
@@ -37,7 +25,7 @@ let currentPlayingUrl = null;
 let currentPlayingBtn = null;
 
 // ==========================================
-// 音域判定ヘルパー関数
+// 音域判定ヘルパー
 // ==========================================
 const PITCH_RANK = {
   "lowA": 10, "lowB": 12, "mid1C": 13, "mid1D": 15, "mid1E": 17, "mid1F": 18, "mid1G": 20,
@@ -48,8 +36,7 @@ const PITCH_RANK = {
 
 function getPitchRank(pitch) {
   if (!pitch) return 0;
-  const clean = pitch.trim();
-  return PITCH_RANK[clean] || 0;
+  return PITCH_RANK[pitch.trim()] || 0;
 }
 
 function matchPitchRange(maxPitch, rangeKey) {
@@ -58,13 +45,13 @@ function matchPitchRange(maxPitch, rangeKey) {
   if (rank === 0) return false;
 
   switch (rangeKey) {
-    case "low": // ~mid2E (29以下)
+    case "low":
       return rank <= 29;
-    case "normal": // mid2F ~ mid2G (30 ~ 32)
+    case "normal":
       return rank >= 30 && rank <= 32;
-    case "high": // mid2G# ~ hiA (33 ~ 34)
+    case "high":
       return rank >= 33 && rank <= 34;
-    case "ultra": // hiA#~ (35以上)
+    case "ultra":
       return rank >= 35;
     default:
       return true;
@@ -86,7 +73,6 @@ document.addEventListener("DOMContentLoaded", () => {
     window.songs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
     renderMylist();
     updateUnregisteredPitchCount();
-    // マイ分析が開かれていれば再集計
     if (!document.getElementById("tabContentAnalysis").classList.contains("hidden")) {
       renderAnalysis();
     }
@@ -126,14 +112,13 @@ function setupNavigation() {
     });
   });
 
-  // 再発掘ボタン
   document.getElementById("btnRefreshRecommend").addEventListener("click", () => {
     loadRecommend(true);
   });
 }
 
 // ==========================================
-// パターンA: 絞り込みボトムシート & チップ制御
+// 絞り込みボトムシート & チップ
 // ==========================================
 function setupFilterSheet() {
   const backdrop = document.getElementById("filterSheetBackdrop");
@@ -167,7 +152,6 @@ function setupFilterSheet() {
     if (e.target === backdrop) closeSheet();
   });
 
-  // ボトムシート内ボタングループの選択ハンドラ
   ["filterStatusGroup", "filterPitchGroup", "filterKeyGroup", "filterEraGroup"].forEach(groupId => {
     const container = document.getElementById(groupId);
     container.addEventListener("click", (e) => {
@@ -191,7 +175,6 @@ function setupFilterSheet() {
     renderMylist();
   });
 
-  // 検索・ソートイベント
   searchInput.addEventListener("input", (e) => {
     currentSearchQuery = e.target.value.toLowerCase().trim();
     renderMylist();
@@ -251,9 +234,7 @@ function updateActiveFilterChips() {
   const badge = document.getElementById("activeFilterBadge");
   const chips = [];
 
-  if (activeFilters.status !== "all") {
-    chips.push({ key: "status", label: `状態: ${activeFilters.status}` });
-  }
+  if (activeFilters.status !== "all") chips.push({ key: "status", label: `状態: ${activeFilters.status}` });
   if (activeFilters.pitchRange !== "all") {
     const map = { low: "低め", normal: "標準", high: "高め", ultra: "超高音" };
     chips.push({ key: "pitchRange", label: `音域: ${map[activeFilters.pitchRange]}` });
@@ -262,12 +243,8 @@ function updateActiveFilterChips() {
     const map = { original: "原曲キー", adjusted: "キー調整あり", duet: "デュエット" };
     chips.push({ key: "keyType", label: `キー: ${map[activeFilters.keyType]}` });
   }
-  if (activeFilters.era !== "all") {
-    chips.push({ key: "era", label: `${activeFilters.era}年代` });
-  }
-  if (activeFilters.tag !== "all") {
-    chips.push({ key: "tag", label: `🏷️ ${activeFilters.tag}` });
-  }
+  if (activeFilters.era !== "all") chips.push({ key: "era", label: `${activeFilters.era}年代` });
+  if (activeFilters.tag !== "all") chips.push({ key: "tag", label: `🏷️ ${activeFilters.tag}` });
 
   if (chips.length > 0) {
     badge.textContent = chips.length;
@@ -281,24 +258,18 @@ function updateActiveFilterChips() {
     return;
   }
 
-  let html = "";
-  chips.forEach(c => {
-    html += `
-      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-950/80 border border-indigo-700/60 text-indigo-200 text-[11px]">
-        ${escapeHtml(c.label)}
-        <button class="remove-chip-btn hover:text-white" data-key="${c.key}"><i class="fa-solid fa-xmark text-[10px]"></i></button>
-      </span>
-    `;
-  });
-  html += `
-    <button id="btnClearAllChips" class="text-[11px] text-gray-400 hover:text-rose-400 underline ml-1">すべてクリア</button>
-  `;
+  let html = chips.map(c => `
+    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-950/80 border border-indigo-700/60 text-indigo-200 text-[11px]">
+      ${escapeHtml(c.label)}
+      <button class="remove-chip-btn hover:text-white" data-key="${c.key}"><i class="fa-solid fa-xmark text-[10px]"></i></button>
+    </span>
+  `).join("");
+  html += `<button id="btnClearAllChips" class="text-[11px] text-gray-400 hover:text-rose-400 underline ml-1">すべてクリア</button>`;
   container.innerHTML = html;
 
   container.querySelectorAll(".remove-chip-btn").forEach(btn => {
     btn.addEventListener("click", () => {
-      const k = btn.getAttribute("data-key");
-      activeFilters[k] = "all";
+      activeFilters[btn.getAttribute("data-key")] = "all";
       updateActiveFilterChips();
       renderMylist();
     });
@@ -322,25 +293,20 @@ function renderMylist() {
   const summaryEl = document.getElementById("mylistCountSummary");
 
   let filtered = window.songs.filter(s => {
-    // 検索ワード
     if (currentSearchQuery) {
       const matchTitle = (s.title || "").toLowerCase().includes(currentSearchQuery);
       const matchArtist = (s.artist || "").toLowerCase().includes(currentSearchQuery);
       const matchTag = (s.tags || []).some(t => t.toLowerCase().includes(currentSearchQuery));
       if (!matchTitle && !matchArtist && !matchTag) return false;
     }
-    // 完成度
     if (activeFilters.status !== "all" && s.status !== activeFilters.status) return false;
-    // 音域帯
     if (!matchPitchRange(s.maxPitch, activeFilters.pitchRange)) return false;
-    // キー設定
     if (activeFilters.keyType !== "all") {
       const k = (s.key || "").trim();
       if (activeFilters.keyType === "original" && (k !== "0" && k !== "原曲" && k !== "")) return false;
       if (activeFilters.keyType === "adjusted" && (k === "0" || k === "原曲" || k === "")) return false;
       if (activeFilters.keyType === "duet" && !(s.tags || []).includes("デュエット")) return false;
     }
-    // 年代
     if (activeFilters.era !== "all") {
       const yr = parseInt(s.releaseYear, 10);
       if (!yr) return false;
@@ -350,13 +316,11 @@ function renderMylist() {
       if (activeFilters.era === "1990" && (yr < 1990 || yr >= 2000)) return false;
       if (activeFilters.era === "1980" && yr >= 1990) return false;
     }
-    // タグ
     if (activeFilters.tag !== "all" && !(s.tags || []).includes(activeFilters.tag)) return false;
 
     return true;
   });
 
-  // ソート
   filtered.sort((a, b) => {
     if (currentSort === "createdAt_desc") return (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0);
     if (currentSort === "createdAt_asc") return (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0);
@@ -392,7 +356,7 @@ function renderMylist() {
     return `
       <div class="song-card bg-dark-800 border border-gray-800 rounded-xl p-3 shadow-sm hover:border-gray-700 transition" data-id="${s.id}">
         <div class="flex items-center gap-3">
-          <!-- ジャケット: タップで試聴再生 (他画面と完全統一) -->
+          <!-- ジャケット: タップで30秒試聴再生 -->
           <div class="relative w-12 h-12 flex-shrink-0 rounded-lg overflow-hidden cursor-pointer group bg-dark-900 border border-gray-700/60 song-cover-play" data-preview="${escapeHtml(preview)}">
             <img src="${cover}" alt="cover" class="w-full h-full object-cover">
             <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
@@ -400,7 +364,7 @@ function renderMylist() {
             </div>
           </div>
 
-          <!-- 曲情報: タップで詳細開閉 -->
+          <!-- 詳細開閉領域 -->
           <div class="flex-1 min-w-0 cursor-pointer card-header-area">
             <div class="flex items-center gap-1.5 mb-0.5">
               <span class="px-1.5 py-0.5 rounded text-[10px] font-bold border ${statusBg}">
@@ -411,7 +375,6 @@ function renderMylist() {
             <div class="text-[11px] text-gray-400 truncate">${escapeHtml(s.artist)}</div>
           </div>
 
-          <!-- 右側バッジ / 開閉トグル -->
           <div class="flex items-center gap-2 flex-shrink-0">
             ${s.score ? `<span class="text-xs font-bold text-emerald-400">${s.score}点</span>` : ""}
             <button class="toggle-detail-btn w-6 h-6 rounded flex items-center justify-center text-gray-500 hover:text-white transition">
@@ -420,7 +383,6 @@ function renderMylist() {
           </div>
         </div>
 
-        <!-- 折りたたみ詳細領域 -->
         <div class="detail-drawer hidden mt-3 pt-3 border-t border-gray-700/60 text-xs text-gray-300 space-y-2">
           <div class="grid grid-cols-2 gap-2 text-[11px]">
             <div><span class="text-gray-500">キー:</span> <span class="font-medium text-gray-200">${escapeHtml(s.key || "原曲")}</span></div>
@@ -452,7 +414,6 @@ function renderMylist() {
     `;
   }).join("");
 
-  // 詳細開閉リスナー
   container.querySelectorAll(".song-card").forEach(card => {
     const header = card.querySelector(".card-header-area");
     const toggleBtn = card.querySelector(".toggle-detail-btn");
@@ -470,7 +431,6 @@ function renderMylist() {
     toggleBtn.addEventListener("click", toggle);
   });
 
-  // 歌ったカウント加算
   container.querySelectorAll(".btn-sing-count").forEach(btn => {
     btn.addEventListener("click", async () => {
       const id = btn.getAttribute("data-id");
@@ -483,17 +443,15 @@ function renderMylist() {
     });
   });
 
-  // 編集モーダル展開
   container.querySelectorAll(".btn-edit-song").forEach(btn => {
     btn.addEventListener("click", () => {
-      const id = btn.getAttribute("data-id");
-      openEditModal(id);
+      openEditModal(btn.getAttribute("data-id"));
     });
   });
 }
 
 // ==========================================
-// 再生統一ロジック (ジャケットタップで30秒試聴)
+// 再生制御 (ジャケットタップで30秒試聴)
 // ==========================================
 function setupAudioPlayer() {
   document.addEventListener("click", (e) => {
@@ -543,7 +501,7 @@ function setupAudioPlayer() {
 }
 
 // ==========================================
-// 名曲発掘 (動的プロファイル & シャッフル取得)
+// 名曲発掘
 // ==========================================
 async function loadRecommend(forceRefresh = false) {
   const profileCard = document.getElementById("karaokeProfileContent");
@@ -555,7 +513,6 @@ async function loadRecommend(forceRefresh = false) {
     return;
   }
 
-  // 1. アーティスト集計
   const artistCounts = {};
   const eraCounts = {};
   window.songs.forEach(s => {
@@ -569,7 +526,6 @@ async function loadRecommend(forceRefresh = false) {
   const sortedArtists = Object.keys(artistCounts).sort((a, b) => artistCounts[b] - artistCounts[a]);
   const sortedEras = Object.keys(eraCounts).sort((a, b) => eraCounts[b] - eraCounts[a]);
 
-  // 動的化: 上位からランダムに1〜2名 + 下位からランダム1名選出
   const topPool = sortedArtists.slice(0, 5);
   const pickedArtist = topPool[Math.floor(Math.random() * topPool.length)] || sortedArtists[0];
   const randomPool = sortedArtists.slice(5);
@@ -586,16 +542,12 @@ async function loadRecommend(forceRefresh = false) {
   listContainer.innerHTML = `<div class="p-6 text-center text-xs text-indigo-400 animate-pulse"><i class="fa-solid fa-spinner fa-spin"></i> iTunesから連想楽曲を発掘中...</div>`;
 
   try {
-    // iTunes APIで広く取得 (25件取得してシャッフル)
     const term = encodeURIComponent(`${pickedArtist}${pickedEra}`);
     const res = await fetch(`https://itunes.apple.com/search?term=${term}&country=jp&entity=song&limit=25`);
     const data = await res.json();
     
-    // マイリスト既登録曲を除外
     const existingTitles = new Set(window.songs.map(s => (s.title || "").toLowerCase()));
     let candidates = (data.results || []).filter(item => !existingTitles.has(item.trackName.toLowerCase()));
-
-    // シャッフル
     candidates = candidates.sort(() => 0.5 - Math.random()).slice(0, 8);
 
     if (candidates.length === 0) {
@@ -645,7 +597,7 @@ async function loadRecommend(forceRefresh = false) {
           score: null,
           maxPitch: "",
           minPitch: "",
-          tags: [], // 名曲発掘タグは廃止
+          tags: [],
           singCount: 0,
           createdAt: serverTimestamp()
         });
@@ -658,16 +610,16 @@ async function loadRecommend(forceRefresh = false) {
 
   } catch (err) {
     console.error("発掘エラー:", err);
-    listContainer.innerHTML = `<div class="bg-dark-800 p-6 rounded-xl text-center text-xs text-rose-400">取得に失敗しました。時間をおいて再試行してください。</div>`;
+    listContainer.innerHTML = `<div class="bg-dark-800 p-6 rounded-xl text-center text-xs text-rose-400">取得に失敗しました</div>`;
   }
 }
 
 // ==========================================
-// 流行チャート (Apple Music / iTunes)
+// 流行チャート
 // ==========================================
 async function loadChart() {
   const container = document.getElementById("chartListContainer");
-  if (container.children.length > 0) return; // 読み込み済み
+  if (container.children.length > 0) return;
 
   container.innerHTML = `<div class="p-6 text-center text-xs text-indigo-400 animate-pulse"><i class="fa-solid fa-spinner fa-spin"></i> チャートを取得中...</div>`;
 
@@ -737,15 +689,13 @@ async function loadChart() {
 }
 
 // ==========================================
-// マイ分析ダッシュボード
+// マイ分析
 // ==========================================
 function renderAnalysis() {
-  // 「これから」を除外したアクティブソング
   const activeSongs = window.songs.filter(s => s.status && s.status !== "これから");
 
   document.getElementById("statActiveCount").textContent = activeSongs.length;
   
-  // スコア集計
   const scored = activeSongs.filter(s => typeof s.score === "number" && s.score > 0);
   const avg = scored.length > 0 ? (scored.reduce((acc, s) => acc + s.score, 0) / scored.length).toFixed(1) : "--";
   document.getElementById("statAvgScore").textContent = avg !== "--" ? `${avg}点` : "--";
@@ -756,7 +706,7 @@ function renderAnalysis() {
   const totalSing = activeSongs.reduce((acc, s) => acc + (s.singCount || 0), 0);
   document.getElementById("statTotalSingCount").textContent = `${totalSing}回`;
 
-  // ボイスレンジ集計
+  // ボイスレンジ
   const pitchRanks = activeSongs.map(s => getPitchRank(s.maxPitch)).filter(r => r > 0);
   const voiceRangeEl = document.getElementById("voiceRangeContainer");
   if (pitchRanks.length > 0) {
@@ -769,7 +719,7 @@ function renderAnalysis() {
         <strong class="text-amber-400 font-bold">${findKey(minR)} 〜 ${findKey(maxR)}</strong>
       </div>
       <p class="text-[11px] text-gray-400 leading-relaxed">
-        ※「得意」「歌える」に設定された曲から最高音の適正帯を算出しています。hiA前後に安定ゾーンがあります。
+        ※「得意」「歌える」に設定された曲から最高音の適正帯を算出しています。
       </p>
     `;
   } else {
@@ -802,7 +752,7 @@ function renderAnalysis() {
     }).join("");
   }
 
-  // ご無沙汰十八番 (得意なのに3ヶ月以上未歌唱)
+  // ご無沙汰十八番
   const threeMonthsAgo = Date.now() / 1000 - 90 * 24 * 60 * 60;
   const dormantSongs = window.songs.filter(s => {
     if (s.status !== "得意") return false;
@@ -834,7 +784,7 @@ function renderAnalysis() {
 }
 
 // ==========================================
-// 設定 & AI音域プロンプト連携
+// 設定 & AI音域連携
 // ==========================================
 function setupSettingsAndAiPitch() {
   const modal = document.getElementById("settingsModal");
@@ -850,7 +800,6 @@ function setupSettingsAndAiPitch() {
   });
   btnClose.addEventListener("click", () => modal.classList.add("hidden"));
 
-  // AI用プロンプト生成＆クリップボードコピー
   btnCopy.addEventListener("click", () => {
     const unregs = window.songs.filter(s => !s.maxPitch || !s.minPitch);
     if (unregs.length === 0) {
@@ -862,11 +811,10 @@ function setupSettingsAndAiPitch() {
     const prompt = `以下の曲リストについて、カラオケにおける「地声最高音」と「最低音」を調査し、下記のJSON配列形式のみで出力してください。Markdownコードブロック(\`\`\`json)などの余計な注釈テキストは一切出力しないでください。\n\n音階は「hiA」「mid2G」「mid1D」などの日本標準カラオケ音域表記を使用してください。不明な場合は空文字にしてください。\n\n[フォーマット例]\n[\n  {"id": "xxx", "maxPitch": "hiA", "minPitch": "mid1C"}\n]\n\n[対象曲リスト]\n${listText}`;
 
     navigator.clipboard.writeText(prompt).then(() => {
-      alert(`音域未設定の ${unregs.length} 曲分のプロンプトをクリップボードにコピーしました！\nAI（ChatGPTやGemini等）に貼り付けて実行し、返ってきたJSONを下の入力欄にペーストしてください。`);
+      alert(`音域未設定の ${unregs.length} 曲分のプロンプトをクリップボードにコピーしました！\nAIに貼り付けて実行し、返ってきたJSONを下の入力欄にペーストしてください。`);
     });
   });
 
-  // 回答JSONパース＆Firestore一括更新
   btnApply.addEventListener("click", async () => {
     let raw = jsonInput.value.trim();
     if (!raw) {
@@ -874,7 +822,6 @@ function setupSettingsAndAiPitch() {
       return;
     }
 
-    // Markdownコードフェンス除去
     raw = raw.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim();
 
     try {
@@ -913,27 +860,51 @@ function updateUnregisteredPitchCount() {
 }
 
 // ==========================================
-// 単曲追加・編集・iTunes検索モーダル
+// 曲の追加・編集モーダル（単曲 / 一括登録統合）
 // ==========================================
 function setupModals() {
   const songModal = document.getElementById("songModal");
   const btnOpenAdd = document.getElementById("btnOpenAddModal");
   const btnCloseSong = document.getElementById("btnCloseSongModal");
   const form = document.getElementById("songForm");
+  const bulkSection = document.getElementById("bulkAddSection");
+  const tabsContainer = document.getElementById("addModalTypeTabs");
+  const tabModeSingle = document.getElementById("tabModeSingle");
+  const tabModeBulk = document.getElementById("tabModeBulk");
   const btnDelete = document.getElementById("btnDeleteSong");
+
+  // モーダル内 タブ切り替え（単曲 vs 一括）
+  const setModalMode = (mode) => {
+    if (mode === "single") {
+      tabModeSingle.className = "py-1.5 rounded-lg bg-indigo-600 text-white text-center transition";
+      tabModeBulk.className = "py-1.5 rounded-lg text-gray-400 hover:text-white text-center transition";
+      form.classList.remove("hidden");
+      bulkSection.classList.add("hidden");
+    } else {
+      tabModeBulk.className = "py-1.5 rounded-lg bg-indigo-600 text-white text-center transition";
+      tabModeSingle.className = "py-1.5 rounded-lg text-gray-400 hover:text-white text-center transition";
+      form.classList.add("hidden");
+      bulkSection.classList.remove("hidden");
+    }
+  };
+
+  tabModeSingle.addEventListener("click", () => setModalMode("single"));
+  tabModeBulk.addEventListener("click", () => setModalMode("bulk"));
 
   btnOpenAdd.addEventListener("click", () => {
     document.getElementById("songModalTitle").textContent = "曲の追加";
+    tabsContainer.classList.remove("hidden"); // 追加時はタブを表示
     form.reset();
     document.getElementById("modalSongId").value = "";
     document.getElementById("modalStatus").value = "これから";
     btnDelete.classList.add("hidden");
+    setModalMode("single");
     songModal.classList.remove("hidden");
   });
 
   btnCloseSong.addEventListener("click", () => songModal.classList.add("hidden"));
 
-  // フォーム送信保存
+  // 単曲保存
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const id = document.getElementById("modalSongId").value;
@@ -977,7 +948,51 @@ function setupModals() {
     }
   });
 
-  // iTunes検索自動補完
+  // 一括登録実行
+  const btnExecBulk = document.getElementById("btnExecuteBulk");
+  const bulkTextarea = document.getElementById("bulkInputArea");
+  const bulkStatusSel = document.getElementById("bulkDefaultStatus");
+
+  btnExecBulk.addEventListener("click", async () => {
+    const lines = bulkTextarea.value.split("\n").map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) return;
+
+    btnExecBulk.disabled = true;
+    btnExecBulk.textContent = "処理中...";
+
+    for (const line of lines) {
+      try {
+        const res = await fetch(`[https://itunes.apple.com/search?term=$](https://itunes.apple.com/search?term=$){encodeURIComponent(line)}&country=jp&entity=song&limit=1`);
+        const data = await res.json();
+        const r = data.results?.[0];
+
+        await addDoc(songsCol, {
+          title: r ? r.trackName : line,
+          artist: r ? r.artistName : "不明",
+          coverUrl: r ? r.artworkUrl100 : null,
+          previewUrl: r ? r.previewUrl : null,
+          releaseYear: r?.releaseDate ? parseInt(r.releaseDate.substring(0, 4), 10) : null,
+          status: bulkStatusSel.value,
+          key: "原曲",
+          score: null,
+          maxPitch: "",
+          minPitch: "",
+          tags: [],
+          singCount: 0,
+          createdAt: serverTimestamp()
+        });
+      } catch (e) {
+        console.error("一括追加エラー:", line, e);
+      }
+    }
+
+    bulkTextarea.value = "";
+    btnExecBulk.disabled = false;
+    btnExecBulk.textContent = "iTunesで取得して一括登録";
+    songModal.classList.add("hidden");
+  });
+
+  // iTunesインライン検索
   const itunesQuery = document.getElementById("itunesSearchQuery");
   const itunesBtn = document.getElementById("btnItunesSearch");
   const itunesResults = document.getElementById("itunesSearchResults");
@@ -1024,15 +1039,16 @@ function setupModals() {
       itunesResults.innerHTML = `<div class="p-2 text-center text-rose-400">検索エラー</div>`;
     }
   });
-
-  // 一括登録モーダル
-  setupBulkModal();
 }
 
 function openEditModal(id) {
   const s = window.songs.find(x => x.id === id);
   if (!s) return;
   document.getElementById("songModalTitle").textContent = "曲の編集";
+  document.getElementById("addModalTypeTabs").classList.add("hidden"); // 編集時はタブ非表示
+  document.getElementById("songForm").classList.remove("hidden");
+  document.getElementById("bulkAddSection").classList.add("hidden");
+
   document.getElementById("modalSongId").value = s.id;
   document.getElementById("modalTitle").value = s.title || "";
   document.getElementById("modalArtist").value = s.artist || "";
@@ -1048,57 +1064,6 @@ function openEditModal(id) {
   document.getElementById("modalTags").value = (s.tags || []).join(", ");
   document.getElementById("btnDeleteSong").classList.remove("hidden");
   document.getElementById("songModal").classList.remove("hidden");
-}
-
-function setupBulkModal() {
-  const modal = document.getElementById("bulkModal");
-  const btnOpen = document.getElementById("btnOpenBulkModal");
-  const btnClose = document.getElementById("btnCloseBulkModal");
-  const btnExec = document.getElementById("btnExecuteBulk");
-  const textarea = document.getElementById("bulkInputArea");
-  const statusSel = document.getElementById("bulkDefaultStatus");
-
-  btnOpen.addEventListener("click", () => modal.classList.remove("hidden"));
-  btnClose.addEventListener("click", () => modal.classList.add("hidden"));
-
-  btnExec.addEventListener("click", async () => {
-    const lines = textarea.value.split("\n").map(l => l.trim()).filter(Boolean);
-    if (lines.length === 0) return;
-
-    btnExec.disabled = true;
-    btnExec.textContent = "処理中...";
-
-    for (const line of lines) {
-      try {
-        const res = await fetch(`[https://itunes.apple.com/search?term=$](https://itunes.apple.com/search?term=$){encodeURIComponent(line)}&country=jp&entity=song&limit=1`);
-        const data = await res.json();
-        const r = data.results?.[0];
-
-        await addDoc(songsCol, {
-          title: r ? r.trackName : line,
-          artist: r ? r.artistName : "不明",
-          coverUrl: r ? r.artworkUrl100 : null,
-          previewUrl: r ? r.previewUrl : null,
-          releaseYear: r?.releaseDate ? parseInt(r.releaseDate.substring(0, 4), 10) : null,
-          status: statusSel.value,
-          key: "原曲",
-          score: null,
-          maxPitch: "",
-          minPitch: "",
-          tags: [],
-          singCount: 0,
-          createdAt: serverTimestamp()
-        });
-      } catch (e) {
-        console.error("一括追加エラー:", line, e);
-      }
-    }
-
-    textarea.value = "";
-    btnExec.disabled = false;
-    btnExec.textContent = "iTunesで取得して一括登録";
-    modal.classList.add("hidden");
-  });
 }
 
 // ユーティリティ
