@@ -14,7 +14,7 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen pb-32 font-sans select-none">
 
-  <!-- ヘッダー (OHAKO名称 / ピックアップ・追加・設定ボタンは完全維持) -->
+  <!-- ヘッダー (案1: インラインSVG本格タイポグラフィロゴ) -->
   <header class="sticky top-0 z-20 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-3.5 py-2 space-y-2">
     <div class="max-w-md mx-auto flex items-center justify-between gap-2">
       <div class="flex items-center gap-2 min-w-0">
@@ -23,9 +23,20 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
           </svg>
         </div>
-        <h1 class="font-extrabold text-sm tracking-tight text-white whitespace-nowrap truncate">
-          OHAKO
-        </h1>
+        <!-- 案1: インラインSVGロゴ -->
+        <div class="flex items-center shrink-0">
+          <svg class="h-6 w-28" viewBox="0 0 140 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="ohakoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#818CF8" />
+                <stop offset="50%" stop-color="#C084FC" />
+                <stop offset="100%" stop-color="#F472B6" />
+              </linearGradient>
+            </defs>
+            <text x="0" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="900" letter-spacing="3.5" fill="url(#ohakoGrad)">OHAKO</text>
+            <circle cx="126" cy="10" r="2.5" fill="#38BDF8" />
+          </svg>
+        </div>
       </div>
       <div class="flex items-center gap-1.5 shrink-0">
         <button onclick="toggleSetlistDrawer()" class="relative bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 whitespace-nowrap shadow-sm">
@@ -41,7 +52,7 @@
       </div>
     </div>
 
-    <!-- 4分割メインナビゲーション (マイ分析タブを追加) -->
+    <!-- 4分割メインナビゲーション -->
     <div class="max-w-md mx-auto grid grid-cols-4 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
       <button id="navTabMyList" onclick="switchMainTab('mylist')" class="py-1.5 rounded-lg font-bold transition bg-indigo-600 text-white shadow text-center truncate">
         マイリスト
@@ -62,15 +73,15 @@
   <main id="viewMyList" class="max-w-md mx-auto p-4 space-y-2.5">
     <div id="statusBanner" class="hidden text-xs p-2.5 rounded-xl border"></div>
 
-    <!-- 上部検索 & パターンA: 絞り込みボタン & チップ表示エリア -->
+    <!-- 上部検索 & ボタン配置入れ替え: 検索窓 -> 絞り込み -> サイコロ -->
     <div class="space-y-2">
       <div class="flex gap-2">
-        <input type="text" id="searchInput" oninput="render()" placeholder="曲名・歌手・タグ・音域等で検索..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm placeholder:text-slate-500 text-slate-100 focus:outline-none focus:border-indigo-500">
-        <button onclick="pickRandom()" class="bg-slate-900 border border-slate-800 px-3 py-2.5 rounded-xl text-base hover:bg-slate-800 transition shrink-0" title="ランダム選曲">🎲</button>
+        <input type="text" id="searchInput" oninput="render()" placeholder="曲名・歌手・タグ・音域等で検索..." class="flex-1 min-w-0 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm placeholder:text-slate-500 text-slate-100 focus:outline-none focus:border-indigo-500">
         <button onclick="openFilterSheet()" class="bg-slate-900 hover:bg-slate-800 border border-slate-800 px-3 py-2.5 rounded-xl text-xs font-bold text-indigo-300 flex items-center gap-1.5 transition shrink-0">
           <span>⚙️ 絞り込み</span>
           <span id="activeFilterBadge" class="hidden bg-indigo-600 text-white text-[9px] px-1.5 py-0.2 rounded-full font-mono">0</span>
         </button>
+        <button onclick="pickRandom()" class="bg-slate-900 border border-slate-800 px-3 py-2.5 rounded-xl text-base hover:bg-slate-800 transition shrink-0" title="ランダム選曲">🎲</button>
       </div>
 
       <!-- 適用中の条件チップ -->
@@ -153,7 +164,7 @@
   <main id="viewAnalysis" class="max-w-md mx-auto p-4 space-y-3.5 hidden">
     <div>
       <h2 class="font-bold text-base text-white">📊 マイ分析ダッシュボード</h2>
-      <p class="text-[11px] text-slate-400">「これから」を除いた主力レパートリーの傾向と健康診断</p>
+      <p class="text-[11px] text-slate-400">「これから」を除いた主力レパートリーの客観データ診断</p>
     </div>
 
     <!-- スタッツサマリー -->
@@ -176,32 +187,58 @@
       </div>
     </div>
 
-    <!-- 得意音域レンジ -->
-    <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-1">
-      <div class="text-[11px] font-bold text-indigo-400">🎤 マイ・ボイスレンジ（得意音域）</div>
-      <div id="analysisVoiceRange" class="text-xs text-slate-200">集計中...</div>
+    <!-- 実戦ボイスレンジ判定 -->
+    <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-2">
+      <div class="text-[11px] font-bold text-indigo-400 flex items-center justify-between">
+        <span>🎤 マイ・ボイスレンジ診断</span>
+        <span class="text-[10px] text-slate-500 font-normal">習熟度実績ベース</span>
+      </div>
+      <div id="analysisVoiceRange" class="space-y-1.5 text-xs text-slate-200">集計中...</div>
     </div>
 
-    <!-- キー別平均スコア -->
-    <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-1.5">
-      <div class="text-[11px] font-bold text-indigo-400">🎯 キー調整と平均スコア</div>
+    <!-- 年代別実戦力ポートフォリオ (帯グラフ) -->
+    <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-2">
+      <div class="text-[11px] font-bold text-indigo-400 flex items-center justify-between">
+        <span>📅 年代別実戦力ポートフォリオ</span>
+        <span class="text-[10px] text-slate-500 font-normal">重み付け戦力判定</span>
+      </div>
+      <div id="analysisDecadeStrength" class="space-y-2 text-xs">集計中...</div>
+    </div>
+
+    <!-- キー調整と改善相関 -->
+    <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-2">
+      <div class="text-[11px] font-bold text-indigo-400 flex items-center justify-between">
+        <span>🎯 キー調整とスコア相関</span>
+        <span id="analysisKeyEffectBadge" class="text-[10px] text-emerald-400 font-mono"></span>
+      </div>
       <div id="analysisKeyScores" class="space-y-1 text-xs">集計中...</div>
     </div>
 
-    <!-- ご無沙汰曲 & ヘビロテ -->
-    <div class="space-y-2">
-      <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-1.5">
-        <div class="text-[11px] font-bold text-amber-400">⚠️ ご無沙汰な十八番（3ヶ月以上未歌唱）</div>
-        <div id="analysisDormantSongs" class="space-y-1 text-xs">データなし</div>
+    <!-- アーティスト偏愛度 & マンネリ度 -->
+    <div class="grid grid-cols-1 gap-2.5">
+      <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-2">
+        <div class="text-[11px] font-bold text-pink-400 flex items-center justify-between">
+          <span>💖 アーティスト偏愛・相性度</span>
+        </div>
+        <div id="analysisArtistAffinity" class="space-y-2 text-xs">集計中...</div>
       </div>
-      <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-1.5">
-        <div class="text-[11px] font-bold text-indigo-300">🔥 最多歌唱 Top 5</div>
-        <div id="analysisMostSung" class="space-y-1 text-xs">データなし</div>
+
+      <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-2">
+        <div class="text-[11px] font-bold text-amber-400 flex items-center justify-between">
+          <span>🔄 マンネリ度 & ご無沙汰アラート</span>
+        </div>
+        <div id="analysisMonotony" class="space-y-2 text-xs">集計中...</div>
       </div>
+    </div>
+
+    <!-- 最多歌唱 Top 5 -->
+    <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-1.5">
+      <div class="text-[11px] font-bold text-indigo-300">🔥 最多歌唱 Top 5</div>
+      <div id="analysisMostSung" class="space-y-1 text-xs">データなし</div>
     </div>
   </main>
 
-  <!-- ==================== 絞り込みボトムシート (パターンA) ==================== -->
+  <!-- ==================== 絞り込みボトムシート ==================== -->
   <div id="filterSheetBackdrop" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div id="filterSheet" class="bottom-sheet absolute bottom-0 inset-x-0 bg-slate-900 border-t border-slate-800 rounded-t-2xl p-4 max-h-[85vh] overflow-y-auto max-w-md mx-auto transform translate-y-full space-y-3.5">
       <div class="flex items-center justify-between pb-2 border-b border-slate-800">
@@ -229,9 +266,9 @@
         </div>
       </div>
 
-      <!-- 2. 完成度 (「これから」追加) -->
+      <!-- 2. 習熟度 (旧: 完成度) -->
       <div>
-        <label class="block text-[11px] font-semibold text-slate-400 mb-1">完成度ステータス</label>
+        <label class="block text-[11px] font-semibold text-slate-400 mb-1">習熟度ステータス</label>
         <div class="flex gap-1 overflow-x-auto no-scrollbar text-xs" id="sheetScoreTabs">
           <button onclick="setScoreFilter('all')" class="score-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0" data-val="all">すべて</button>
           <button onclick="setScoreFilter('得意')" class="score-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="得意">得意</button>
@@ -241,7 +278,7 @@
         </div>
       </div>
 
-      <!-- 3. キー属性 (シンプル化) -->
+      <!-- 3. キー設定 -->
       <div>
         <label class="block text-[11px] font-semibold text-slate-400 mb-1">キー設定</label>
         <div class="flex gap-1 overflow-x-auto no-scrollbar text-[11px]" id="sheetAttrTabs">
@@ -252,7 +289,7 @@
         </div>
       </div>
 
-      <!-- 4. 音域帯（直感ラベル方式） -->
+      <!-- 4. 音域帯 -->
       <div>
         <label class="block text-[11px] font-semibold text-slate-400 mb-1">最高音の高さ帯</label>
         <div class="flex gap-1 overflow-x-auto no-scrollbar text-xs" id="sheetPitchTabs">
@@ -288,7 +325,7 @@
     </div>
   </div>
 
-  <!-- ピックアップ管理ドロワー (完全維持) -->
+  <!-- ピックアップ管理ドロワー -->
   <div id="setlistDrawer" class="fixed inset-x-0 bottom-0 z-40 bg-slate-900/98 backdrop-blur border-t border-slate-800 p-4 transform translate-y-full transition-transform duration-300 max-w-md mx-auto rounded-t-2xl shadow-2xl space-y-3">
     <div class="flex justify-between items-center border-b border-slate-800 pb-2">
       <div>
@@ -307,7 +344,7 @@
     <div id="setlistItems" class="max-h-60 overflow-y-auto no-scrollbar space-y-2"></div>
   </div>
 
-  <!-- 管理設定モーダル (AI音域連携セクションを追加) -->
+  <!-- 管理設定モーダル -->
   <div id="settingsModal" class="fixed inset-0 z-50 bg-black/80 hidden flex items-center justify-center p-4 overflow-y-auto">
     <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-5 shadow-2xl my-auto space-y-4">
       <div class="flex justify-between items-center border-b border-slate-800 pb-2.5">
@@ -329,7 +366,7 @@
         </button>
         <div class="pt-1 space-y-1">
           <textarea id="aiPitchJsonInput" rows="3" placeholder='AIの回答JSONを貼り付け&#10;[{"id":"...", "maxPitch":"hiA", "minPitch":"mid1D"}]' class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white placeholder:text-slate-600 font-mono"></textarea>
-          <button onclick="applyAiPitchJson()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-1.5 rounded-lg text-xs font-bold transition">
+          <button id="btnApplyAiPitch" onclick="applyAiPitchJson()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-1.5 rounded-lg text-xs font-bold transition">
             📥 音域データを反映
           </button>
         </div>
@@ -378,7 +415,7 @@
     </div>
   </div>
 
-  <!-- 追加・編集モーダル (単曲/一括切替構造は完全維持 + 「これから」追加) -->
+  <!-- 追加・編集モーダル -->
   <div id="modal" class="fixed inset-0 z-50 bg-black/80 hidden flex items-center justify-center p-3 overflow-y-auto">
     <div class="bg-slate-900 border border-slate-800 w-full max-w-md max-h-[92vh] flex flex-col rounded-2xl p-4 shadow-2xl my-auto space-y-3">
       
@@ -481,7 +518,7 @@
               </select>
             </div>
             <div>
-              <label class="block text-xs text-slate-400 mb-1">完成度</label>
+              <label class="block text-xs text-slate-400 mb-1">習熟度</label>
               <select id="formScore" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 focus:outline-none">
                 <option value="得意">得意</option>
                 <option value="歌える">歌える</option>
@@ -525,7 +562,7 @@
         </form>
       </div>
 
-      <!-- パネルB: まとめて一括登録 (初期選択に「これから」を追加) -->
+      <!-- パネルB: まとめて一括登録 -->
       <div id="modalPanelBulk" class="space-y-3 overflow-y-auto no-scrollbar flex-1 flex flex-col min-h-0">
         <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 text-[11px] text-slate-400 space-y-1 shrink-0">
           <div class="text-indigo-400 font-bold">📋 曲名リストを貼り付けて一括取得</div>
@@ -553,7 +590,7 @@
           <div class="flex justify-between items-center text-[11px] text-slate-400 px-0.5 shrink-0">
             <span id="bulkFoundCount">0件取得</span>
             <div class="flex items-center gap-1.5">
-              <span class="text-[10px] text-slate-500">一括完成度:</span>
+              <span class="text-[10px] text-slate-500">一括習熟度:</span>
               <select onchange="bulkSetAllScore(this.value)" class="bg-slate-950 border border-slate-800 text-slate-300 text-[10px] rounded px-1.5 py-0.5 focus:outline-none">
                 <option value="keep">変更なし</option>
                 <option value="これから" selected>全件: これから</option>
@@ -578,7 +615,7 @@
     </div>
   </div>
 
-  <!-- アーティストディスコグラフィ全件モーダル (完全維持) -->
+  <!-- アーティストディスコグラフィ全件モーダル -->
   <div id="artistModal" class="fixed inset-0 z-50 bg-black/80 hidden flex items-center justify-center p-3 overflow-y-auto">
     <div class="bg-slate-900 border border-slate-800 w-full max-w-md max-h-[92vh] flex flex-col rounded-2xl p-4 shadow-2xl my-auto space-y-3">
       <div class="flex items-center justify-between border-b border-slate-800 pb-2.5 shrink-0">
