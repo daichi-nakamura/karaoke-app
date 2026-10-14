@@ -24,10 +24,6 @@
               800: '#111827',
               700: '#1F2937',
               600: '#374151',
-            },
-            accent: {
-              500: '#6366F1',
-              600: '#4F46E5',
             }
           }
         }
@@ -67,10 +63,7 @@
         </h1>
       </div>
       <div class="flex items-center gap-2">
-        <button id="btnOpenBulkModal" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-semibold text-gray-200 border border-gray-700 transition flex items-center gap-1.5">
-          <i class="fa-solid fa-layer-group text-indigo-400"></i> 一括登録
-        </button>
-        <button id="btnOpenAddModal" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white shadow-md shadow-indigo-600/30 transition flex items-center gap-1.5">
+        <button id="btnOpenAddModal" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white shadow-md shadow-indigo-600/30 transition flex items-center gap-1.5">
           <i class="fa-solid fa-plus"></i> 曲を追加
         </button>
         <button id="btnOpenSettingsModal" class="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white border border-gray-700 transition" title="設定・AI連携">
@@ -101,7 +94,7 @@
 
     <!-- ================= 1. マイリスト タブ ================= -->
     <section id="tabContentMylist" class="tab-section block">
-      <!-- 上部コントロール（パターンA: 検索窓 + 絞り込みボタン + 適用条件チップ） -->
+      <!-- パターンA: 検索窓 + 絞り込みボタン + 適用条件チップ -->
       <div class="bg-dark-800/90 border border-gray-800 rounded-xl p-3 mb-4 space-y-2.5 shadow-sm">
         <div class="flex items-center gap-2">
           <div class="relative flex-1">
@@ -115,9 +108,8 @@
           </button>
         </div>
 
-        <!-- 適用中条件の表示チップエリア -->
         <div id="activeChipsContainer" class="flex flex-wrap items-center gap-1.5 text-xs">
-          <!-- JSで動的にチップ描画 -->
+          <!-- チップを動的描画 -->
         </div>
       </div>
 
@@ -157,7 +149,7 @@
         <p class="text-xs text-gray-400">登録曲の傾向から、次のレパートリーを連想リコメンド</p>
       </div>
 
-      <!-- カラオケプロファイル表示カード -->
+      <!-- カラオケプロファイル -->
       <div id="karaokeProfileCard" class="bg-gradient-to-br from-indigo-950/40 via-dark-800 to-dark-800 border border-indigo-900/40 rounded-xl p-4 mb-4 shadow-sm">
         <div class="flex items-center gap-2 text-indigo-300 text-xs font-bold uppercase tracking-wider mb-2">
           <i class="fa-solid fa-fingerprint"></i> カラオケプロファイル
@@ -180,7 +172,6 @@
           🔥 Apple Music / iTunes 流行チャート
         </h2>
       </div>
-      <!-- チャート楽曲リスト -->
       <div id="chartListContainer" class="space-y-2.5">
         <!-- JSで描画 -->
       </div>
@@ -217,11 +208,9 @@
 
       <!-- マイ・ボイスレンジ -->
       <div class="bg-dark-800 border border-gray-800 rounded-xl p-4">
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="text-xs font-bold text-indigo-300 flex items-center gap-1.5 uppercase">
-            <i class="fa-solid fa-wave-square"></i> マイ・ボイスレンジ（得意音域）
-          </h3>
-        </div>
+        <h3 class="text-xs font-bold text-indigo-300 flex items-center gap-1.5 uppercase mb-2">
+          <i class="fa-solid fa-wave-square"></i> マイ・ボイスレンジ（得意音域）
+        </h3>
         <div id="voiceRangeContainer" class="text-xs text-gray-300 space-y-2">
           データ収集中...
         </div>
@@ -353,7 +342,6 @@
         </button>
       </div>
 
-      <!-- AI音域補完セクション -->
       <div class="bg-dark-800/80 border border-gray-800 rounded-xl p-4 space-y-3">
         <div class="flex items-center justify-between">
           <span class="text-xs font-bold text-white flex items-center gap-1.5">
@@ -365,7 +353,6 @@
           最高音・最低音が空の曲を抽出し、AI（ChatGPTやGemini等）に調査させるプロンプトを生成します。AIの回答JSONを貼り付けるだけでFirestoreへ一括反映されます。
         </p>
 
-        <!-- ステップ1 -->
         <div class="space-y-1.5">
           <div class="text-[11px] font-semibold text-gray-300">① AI用プロンプトの作成</div>
           <button id="btnCopyPitchPrompt" class="w-full py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-semibold text-gray-200 border border-gray-700 flex items-center justify-center gap-2 transition">
@@ -373,7 +360,6 @@
           </button>
         </div>
 
-        <!-- ステップ2 -->
         <div class="space-y-1.5 pt-1">
           <div class="text-[11px] font-semibold text-gray-300">② AIの回答JSONを貼り付け</div>
           <textarea id="aiPitchJsonInput" rows="4" placeholder='[&#10;  {"id": "...", "maxPitch": "hiA", "minPitch": "mid1D"}&#10;]' class="w-full bg-dark-900 border border-gray-700 rounded-lg p-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 font-mono"></textarea>
@@ -385,20 +371,26 @@
     </div>
   </div>
 
-  <!-- ================= 単曲 登録/編集モーダル ================= -->
+  <!-- ================= 曲の追加・編集モーダル（単曲 / 一括登録統合型） ================= -->
   <div id="songModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div class="bg-dark-900 border border-gray-800 rounded-2xl w-full max-w-md p-5 max-h-[90vh] overflow-y-auto space-y-4">
       <div class="flex items-center justify-between pb-2 border-b border-gray-800">
-        <h3 id="songModalTitle" class="font-bold text-sm text-white">曲の追加・編集</h3>
+        <h3 id="songModalTitle" class="font-bold text-sm text-white">曲の追加</h3>
         <button id="btnCloseSongModal" class="w-7 h-7 rounded-full bg-gray-800 text-gray-300 flex items-center justify-center">
           <i class="fa-solid fa-xmark text-xs"></i>
         </button>
       </div>
 
-      <form id="songForm" class="space-y-3 text-xs">
+      <!-- モーダル内 単曲 / 一括登録 タブ切り替え（追加時のみ表示） -->
+      <div id="addModalTypeTabs" class="grid grid-cols-2 gap-1 p-1 bg-dark-800 border border-gray-700 rounded-xl text-xs font-semibold">
+        <button type="button" id="tabModeSingle" class="py-1.5 rounded-lg bg-indigo-600 text-white text-center transition">単曲登録</button>
+        <button type="button" id="tabModeBulk" class="py-1.5 rounded-lg text-gray-400 hover:text-white text-center transition">一括登録</button>
+      </div>
+
+      <!-- 単曲登録フォーム -->
+      <form id="songForm" class="space-y-3 text-xs block">
         <input type="hidden" id="modalSongId">
 
-        <!-- iTunes検索インライン -->
         <div>
           <label class="block text-gray-400 mb-1">iTunesで自動補完</label>
           <div class="flex gap-1.5">
@@ -474,43 +466,33 @@
           <button type="button" id="btnDeleteSong" class="hidden px-4 py-2.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 border border-rose-800/60 font-bold text-rose-300 transition">削除</button>
         </div>
       </form>
-    </div>
-  </div>
 
-  <!-- ================= 一括登録モーダル ================= -->
-  <div id="bulkModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-dark-900 border border-gray-800 rounded-2xl w-full max-w-lg p-5 max-h-[90vh] overflow-y-auto space-y-4">
-      <div class="flex items-center justify-between pb-2 border-b border-gray-800">
-        <h3 class="font-bold text-sm text-white flex items-center gap-1.5">
-          <i class="fa-solid fa-layer-group text-indigo-400"></i> 一括登録
-        </h3>
-        <button id="btnCloseBulkModal" class="w-7 h-7 rounded-full bg-gray-800 text-gray-300 flex items-center justify-center">
-          <i class="fa-solid fa-xmark text-xs"></i>
+      <!-- 一括登録フォーム（タブ切り替えで表示） -->
+      <div id="bulkAddSection" class="space-y-3 text-xs hidden">
+        <p class="text-gray-400">1行に1曲ずつ「曲名 アーティスト名」を入力してください。iTunesから情報と音源を自動取得します。</p>
+        <textarea id="bulkInputArea" rows="6" placeholder="白日 King Gnu&#10;怪獣の花唄 Vaundy&#10;Lemon 米津玄師" class="w-full bg-dark-800 border border-gray-700 rounded-lg p-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500"></textarea>
+
+        <div class="flex items-center justify-between">
+          <span class="text-gray-400">初期完成度:</span>
+          <select id="bulkDefaultStatus" class="bg-dark-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200">
+            <option value="これから" selected>これから</option>
+            <option value="練習中">練習中</option>
+            <option value="歌える">歌える</option>
+            <option value="得意">得意</option>
+          </select>
+        </div>
+
+        <button type="button" id="btnExecuteBulk" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 font-bold text-xs text-white transition">
+          iTunesで取得して一括登録
         </button>
       </div>
-      <p class="text-xs text-gray-400">1行に1曲ずつ「曲名 アーティスト名」を入力してください。iTunesから情報と音源を自動取得します。</p>
-      <textarea id="bulkInputArea" rows="6" placeholder="白日 King Gnu&#10;怪獣の花唄 Vaundy&#10;Lemon 米津玄師" class="w-full bg-dark-800 border border-gray-700 rounded-lg p-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500"></textarea>
-
-      <div class="flex items-center justify-between">
-        <span class="text-xs text-gray-400">初期完成度:</span>
-        <select id="bulkDefaultStatus" class="bg-dark-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200">
-          <option value="これから" selected>これから</option>
-          <option value="練習中">練習中</option>
-          <option value="歌える">歌える</option>
-          <option value="得意">得意</option>
-        </select>
-      </div>
-
-      <button id="btnExecuteBulk" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 font-bold text-xs text-white transition">
-        iTunesで取得して一括登録
-      </button>
     </div>
   </div>
 
   <!-- グローバル音声プレビュー用Audio -->
   <audio id="globalAudioPlayer" class="hidden"></audio>
 
-  <!-- Firebase & App Script -->
+  <!-- スクリプト -->
   <script type="module" src="app.js"></script>
 </body>
 </html>
