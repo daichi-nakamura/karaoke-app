@@ -14,7 +14,7 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen pb-32 font-sans select-none">
 
-  <!-- ヘッダー (案1: インラインSVG本格タイポグラフィロゴ) -->
+  <!-- ヘッダー (インラインSVGタイポグラフィロゴ) -->
   <header class="sticky top-0 z-20 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-3.5 py-2 space-y-2">
     <div class="max-w-md mx-auto flex items-center justify-between gap-2">
       <div class="flex items-center gap-2 min-w-0">
@@ -23,7 +23,6 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
           </svg>
         </div>
-        <!-- 案1: インラインSVGロゴ -->
         <div class="flex items-center shrink-0">
           <svg class="h-6 w-28" viewBox="0 0 140 32" fill="none" xmlns="http://www.w3.org/2000/svg">
             <defs>
@@ -73,18 +72,26 @@
   <main id="viewMyList" class="max-w-md mx-auto p-4 space-y-2.5">
     <div id="statusBanner" class="hidden text-xs p-2.5 rounded-xl border"></div>
 
-    <!-- 上部検索 & ボタン配置入れ替え: 検索窓 -> 絞り込み -> サイコロ -->
+    <!-- 上部操作バー: 1行目右揃え(空気読み/サイコロ) -> 2行目(検索/絞り込み) -> 3行目(チップ) -->
     <div class="space-y-2">
+      <!-- 1行目: 右揃えボタン群 -->
+      <div class="flex items-center justify-end gap-1.5">
+        <button onclick="openMoodSuggestModal()" class="bg-indigo-950/70 hover:bg-indigo-900 border border-indigo-700/60 text-indigo-300 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 shadow-sm transition">
+          <span>💡 空気読み選曲</span>
+        </button>
+        <button onclick="pickRandom()" class="bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl text-sm hover:bg-slate-800 transition" title="ランダム選曲">🎲</button>
+      </div>
+
+      <!-- 2行目: 検索入力 ＋ 絞り込みボタン -->
       <div class="flex gap-2">
         <input type="text" id="searchInput" oninput="render()" placeholder="曲名・歌手・タグ・音域等で検索..." class="flex-1 min-w-0 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm placeholder:text-slate-500 text-slate-100 focus:outline-none focus:border-indigo-500">
         <button onclick="openFilterSheet()" class="bg-slate-900 hover:bg-slate-800 border border-slate-800 px-3 py-2.5 rounded-xl text-xs font-bold text-indigo-300 flex items-center gap-1.5 transition shrink-0">
           <span>⚙️ 絞り込み</span>
           <span id="activeFilterBadge" class="hidden bg-indigo-600 text-white text-[9px] px-1.5 py-0.2 rounded-full font-mono">0</span>
         </button>
-        <button onclick="pickRandom()" class="bg-slate-900 border border-slate-800 px-3 py-2.5 rounded-xl text-base hover:bg-slate-800 transition shrink-0" title="ランダム選曲">🎲</button>
       </div>
 
-      <!-- 適用中の条件チップ -->
+      <!-- 3行目: 適用中の条件チップ (絞り込みの直下) -->
       <div id="activeFilterChipsContainer" class="flex flex-wrap items-center gap-1.5 text-xs min-h-[20px]"></div>
     </div>
 
@@ -162,9 +169,14 @@
 
   <!-- ==================== 4. マイ分析画面 ==================== -->
   <main id="viewAnalysis" class="max-w-md mx-auto p-4 space-y-3.5 hidden">
-    <div>
-      <h2 class="font-bold text-base text-white">📊 マイ分析ダッシュボード</h2>
-      <p class="text-[11px] text-slate-400">「これから」を除いた主力レパートリーの客観データ診断</p>
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="font-bold text-base text-white">📊 マイ分析ダッシュボード</h2>
+        <p class="text-[11px] text-slate-400">主力レパートリーの客観データ診断</p>
+      </div>
+      <button onclick="openSummaryModal()" class="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-md transition whitespace-nowrap flex items-center gap-1">
+        <span>🤖 カラオケ総括</span>
+      </button>
     </div>
 
     <!-- スタッツサマリー -->
@@ -238,7 +250,182 @@
     </div>
   </main>
 
-  <!-- ==================== 絞り込みボトムシート ==================== -->
+  <!-- ==================== 空気読み選曲モーダル ==================== -->
+  <div id="moodModal" class="fixed inset-0 z-50 bg-black/80 hidden flex items-center justify-center p-3 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-md max-h-[92vh] flex flex-col rounded-2xl p-4 shadow-2xl my-auto space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2 shrink-0">
+        <div class="flex items-center gap-1.5">
+          <span class="text-base">💡</span>
+          <h2 class="text-sm font-bold text-white">空気読み選曲（次の一手）</h2>
+        </div>
+        <button onclick="closeMoodSuggestModal()" class="text-slate-400 hover:text-white text-sm p-1">✕</button>
+      </div>
+
+      <!-- 直近の流れ表示 -->
+      <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 space-y-1.5 shrink-0">
+        <div class="text-[10px] text-slate-400 font-semibold">【直近の流れ】(タップで追加)</div>
+        <div id="moodFlowChain" class="flex flex-wrap items-center gap-1.5 min-h-[28px] text-xs">
+          <span class="text-slate-500 text-[11px]">下のボタンを押して流れを入力...</span>
+        </div>
+      </div>
+
+      <!-- 1. 縛り・属性チップ (トグル) -->
+      <div class="space-y-1 shrink-0">
+        <div class="text-[10px] text-slate-400 font-semibold">1. 縛り・ジャンル（任意）</div>
+        <div class="grid grid-cols-2 gap-1.5 text-xs">
+          <button type="button" onclick="toggleMoodAttr('ani')" id="moodAttr_ani" class="py-1.5 px-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 text-left flex items-center gap-1 transition">
+            <span>🎬 アニソン</span>
+          </button>
+          <button type="button" onclick="toggleMoodAttr('vocaloid')" id="moodAttr_vocaloid" class="py-1.5 px-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 text-left flex items-center gap-1 transition">
+            <span>🤖 ボカロ</span>
+          </button>
+          <button type="button" onclick="toggleMoodAttr('nostalgia')" id="moodAttr_nostalgia" class="py-1.5 px-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 text-left flex items-center gap-1 transition">
+            <span>📻 懐メロ/90-00s</span>
+          </button>
+          <button type="button" onclick="toggleMoodAttr('trend')" id="moodAttr_trend" class="py-1.5 px-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 text-left flex items-center gap-1 transition">
+            <span>👶 最新トレンド</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. テンションボタン (決定トリガー) -->
+      <div class="space-y-1 shrink-0">
+        <div class="text-[10px] text-slate-400 font-semibold">2. テンション（押して1曲追加）</div>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <button type="button" onclick="pushMoodStep('🔥 盛り上がり')" class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-rose-950/80 to-amber-950/80 border border-rose-800/80 hover:border-rose-600 text-rose-200 font-bold flex items-center justify-center gap-1.5 active:scale-95 transition">
+            <span>🔥 盛り上がり</span>
+          </button>
+          <button type="button" onclick="pushMoodStep('🍷 バラード')" class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-violet-950/80 to-indigo-950/80 border border-violet-800/80 hover:border-violet-600 text-violet-200 font-bold flex items-center justify-center gap-1.5 active:scale-95 transition">
+            <span>🍷 バラード</span>
+          </button>
+          <button type="button" onclick="pushMoodStep('🎙️ 定番・王道')" class="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold flex items-center justify-center gap-1.5 active:scale-95 transition">
+            <span>🎙️ 定番・王道</span>
+          </button>
+          <button type="button" onclick="pushMoodStep('🤪 ネタ・変化球')" class="py-2.5 px-3 rounded-xl bg-amber-950/70 hover:bg-amber-900/80 border border-amber-800/80 text-amber-200 font-bold flex items-center justify-center gap-1.5 active:scale-95 transition">
+            <span>🤪 ネタ・変化球</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- AI相談ボタン & 結果枠 -->
+      <button type="button" id="btnRunMoodSuggest" onclick="runMoodSuggest()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl font-bold text-xs shadow-md transition shrink-0 flex items-center justify-center gap-1">
+        <span>🤖 AI相棒に次の一手を聞く</span>
+      </button>
+
+      <div id="moodSuggestResult" class="space-y-2 overflow-y-auto no-scrollbar flex-1 min-h-0 hidden"></div>
+    </div>
+  </div>
+
+  <!-- ==================== 勝手にカラオケ総括モーダル ==================== -->
+  <div id="summaryModal" class="fixed inset-0 z-50 bg-black/80 hidden flex items-center justify-center p-3 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-md max-h-[92vh] flex flex-col rounded-2xl p-4 shadow-2xl my-auto space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2 shrink-0">
+        <div class="flex items-center gap-1.5">
+          <span class="text-base">🤖</span>
+          <h2 class="text-sm font-bold text-white">勝手にカラオケ総括・評論</h2>
+        </div>
+        <button onclick="closeSummaryModal()" class="text-slate-400 hover:text-white text-sm p-1">✕</button>
+      </div>
+
+      <div class="flex items-center justify-between gap-2 bg-slate-950 p-2 rounded-xl border border-slate-800 shrink-0 text-xs">
+        <span class="text-slate-400">対象日:</span>
+        <input type="date" id="summaryTargetDate" onchange="loadSummarySongsForDate()" class="bg-slate-900 border border-slate-700 text-white px-2 py-1 rounded-lg text-xs focus:outline-none">
+        <span class="text-[10px] text-slate-500">※翌日AM6時迄含む</span>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 space-y-2">
+        <div class="flex items-center justify-between text-[11px] text-slate-400 px-0.5 shrink-0">
+          <span id="summarySongCount">0曲抽出</span>
+          <span class="text-[10px] text-slate-500">並び順変更・除外が可能</span>
+        </div>
+        <div id="summarySongList" class="flex-1 overflow-y-auto no-scrollbar space-y-1.5 min-h-0 pr-0.5"></div>
+      </div>
+
+      <button type="button" id="btnGenerateSummary" onclick="generateAiSummary()" class="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white py-2.5 rounded-xl font-bold text-xs shadow-md transition shrink-0">
+        ✨ 総括レビューを生成する
+      </button>
+
+      <div id="summaryResultArea" class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2 text-xs overflow-y-auto no-scrollbar max-h-48 hidden shrink-0"></div>
+    </div>
+  </div>
+
+  <!-- ==================== 私の十八番名刺モーダル ==================== -->
+  <div id="cardShareModal" class="fixed inset-0 z-50 bg-black/80 hidden flex items-center justify-center p-3 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-md max-h-[92vh] flex flex-col rounded-2xl p-4 shadow-2xl my-auto space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2 shrink-0">
+        <div class="flex items-center gap-1.5">
+          <span class="text-base">📇</span>
+          <h2 class="text-sm font-bold text-white">私の十八番名刺（シェア）</h2>
+        </div>
+        <button onclick="closeCardShareModal()" class="text-slate-400 hover:text-white text-sm p-1">✕</button>
+      </div>
+
+      <div class="space-y-1.5 shrink-0">
+        <label class="block text-xs font-semibold text-slate-400">公開範囲を選択</label>
+        <div class="grid grid-cols-2 gap-1.5 text-xs">
+          <button type="button" onclick="selectCardScope('mastered')" id="cardScope_mastered" class="py-2 px-2.5 rounded-xl bg-indigo-600 text-white font-bold border border-indigo-500 text-left transition">
+            <div>👑 鉄板のみ</div>
+            <div class="text-[9px] font-normal opacity-80">習熟度「得意」のみ</div>
+          </button>
+          <button type="button" onclick="selectCardScope('main')" id="cardScope_main" class="py-2 px-2.5 rounded-xl bg-slate-950 text-slate-300 border border-slate-800 text-left transition">
+            <div>🎤 主力レパートリー</div>
+            <div class="text-[9px] text-slate-500">「得意」「歌える」</div>
+          </button>
+          <button type="button" onclick="selectCardScope('all')" id="cardScope_all" class="py-2 px-2.5 rounded-xl bg-slate-950 text-slate-300 border border-slate-800 text-left transition">
+            <div>📚 全件オープン</div>
+            <div class="text-[9px] text-slate-500">練習中・これから含む</div>
+          </button>
+          <button type="button" onclick="selectCardScope('pickup')" id="cardScope_pickup" class="py-2 px-2.5 rounded-xl bg-slate-950 text-slate-300 border border-slate-800 text-left transition">
+            <div>⭐ 本日のピックアップ</div>
+            <div class="text-[9px] text-slate-500">ピックアップ曲のみ</div>
+          </button>
+        </div>
+      </div>
+
+      <div class="space-y-2 shrink-0">
+        <div class="text-[11px] text-slate-400 flex justify-between">
+          <span>発行URL（相手の端末で開けます）:</span>
+          <span id="cardShareCountBadge" class="text-indigo-400 font-mono">0曲</span>
+        </div>
+        <div class="flex gap-1.5">
+          <input type="text" id="cardShareUrlInput" readonly class="flex-1 bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-300 font-mono focus:outline-none">
+          <button type="button" onclick="copyCardShareUrl()" id="btnCopyCardUrl" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap">
+            コピー
+          </button>
+        </div>
+      </div>
+
+      <div class="pt-2 border-t border-slate-800 shrink-0">
+        <button type="button" onclick="closeCardShareModal()" class="w-full bg-slate-800 text-slate-300 py-2 rounded-lg text-xs font-bold">
+          閉じる
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 閲覧専用：名刺ビュー画面 ==================== -->
+  <div id="cardViewModal" class="fixed inset-0 z-50 bg-slate-950 hidden overflow-y-auto p-4">
+    <div class="max-w-md mx-auto space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white text-sm font-bold">
+            📇
+          </div>
+          <div>
+            <h1 class="text-base font-extrabold text-white">OHAKO REPERTOIRE</h1>
+            <p id="cardViewSubtitle" class="text-[10px] text-slate-400">共有されたレパートリー名刺</p>
+          </div>
+        </div>
+        <button onclick="closeCardView()" class="text-slate-400 hover:text-white text-xs bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg">
+          閉じる
+        </button>
+      </div>
+
+      <div id="cardViewList" class="space-y-2"></div>
+    </div>
+  </div>
+
+  <!-- 絞り込みボトムシート -->
   <div id="filterSheetBackdrop" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
     <div id="filterSheet" class="bottom-sheet absolute bottom-0 inset-x-0 bg-slate-900 border-t border-slate-800 rounded-t-2xl p-4 max-h-[85vh] overflow-y-auto max-w-md mx-auto transform translate-y-full space-y-3.5">
       <div class="flex items-center justify-between pb-2 border-b border-slate-800">
@@ -266,7 +453,7 @@
         </div>
       </div>
 
-      <!-- 2. 習熟度 (旧: 完成度) -->
+      <!-- 2. 習熟度 -->
       <div>
         <label class="block text-[11px] font-semibold text-slate-400 mb-1">習熟度ステータス</label>
         <div class="flex gap-1 overflow-x-auto no-scrollbar text-xs" id="sheetScoreTabs">
@@ -344,12 +531,35 @@
     <div id="setlistItems" class="max-h-60 overflow-y-auto no-scrollbar space-y-2"></div>
   </div>
 
-  <!-- 管理設定モーダル -->
+  <!-- 管理設定モーダル (Gemini APIキー & 名刺共有ボタン追加) -->
   <div id="settingsModal" class="fixed inset-0 z-50 bg-black/80 hidden flex items-center justify-center p-4 overflow-y-auto">
     <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-5 shadow-2xl my-auto space-y-4">
       <div class="flex justify-between items-center border-b border-slate-800 pb-2.5">
         <h2 class="text-base font-bold flex items-center gap-1.5 text-white">⚙️ 管理・メンテナンス設定</h2>
         <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-white text-sm p-1">✕</button>
+      </div>
+
+      <!-- Gemini API連携設定 -->
+      <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-2">
+        <span class="text-xs font-bold text-indigo-400">✨ Gemini API 設定（空気読み・総括）</span>
+        <p class="text-[11px] text-slate-400 leading-relaxed">
+          Google AI StudioのAPIキーを入力すると、空気読み選曲とカラオケ総括で本格AI相棒が利用可能になります。
+        </p>
+        <div class="flex gap-1.5 pt-1">
+          <input type="password" id="geminiApiKeyInput" placeholder="AIzaSy..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none">
+          <button type="button" onclick="saveGeminiApiKey()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap">保存</button>
+        </div>
+      </div>
+
+      <!-- 名刺共有セクション -->
+      <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-2">
+        <span class="text-xs font-bold text-sky-400">📇 私の十八番名刺を発行</span>
+        <p class="text-[11px] text-slate-400 leading-relaxed">
+          あなたの持ち曲を相手のスマホで見せられるURLを発行します（公開範囲を選択可能）。
+        </p>
+        <button onclick="openCardShareModal()" class="w-full bg-slate-800 hover:bg-slate-700 text-sky-300 py-1.5 rounded-lg text-xs font-medium border border-slate-700 flex items-center justify-center gap-1">
+          <span>🔗 名刺URLを発行</span>
+        </button>
       </div>
 
       <!-- AI音域補完セクション -->
