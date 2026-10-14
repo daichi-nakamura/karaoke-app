@@ -21,6 +21,13 @@ let currentAudio = null;
 let currentPlayingId = null;
 let undoHistory = {};
 
+// 空気読みセッション用
+let currentMoodFlow = [];
+let activeMoodAttrs = new Set();
+
+// 総括編集用
+let summaryCandidateSongs = [];
+
 // アーティスト連想マップ
 const ARTIST_RELATIONS = {
   'king gnu': ['Official髭男dism', 'Vaundy', '米津玄師', '藤井風'],
@@ -99,7 +106,6 @@ function matchPitchRange(maxPitch, rangeKey) {
   }
 }
 
-// ひらがな・カタカナ相互変換
 function hiraToKata(str) {
   return (str || '').replace(/[\u3041-\u3096]/g, m => String.fromCharCode(m.charCodeAt(0) + 0x60));
 }
@@ -108,18 +114,6 @@ function kataToHira(str) {
   return (str || '').replace(/[\u30a1-\u30f6]/g, m => String.fromCharCode(m.charCodeAt(0) - 0x60));
 }
 
-// 簡易ローマ字展開（英字検索をかなでヒットさせる補助）
-function romanizeSimple(str) {
-  const map = {
-    'k': ['か','き','く','け','こ'], 's': ['さ','し','す','せ','そ'],
-    't': ['た','ち','つ','て','と'], 'n': ['な','に','ぬ','ね','の'],
-    'h': ['は','ひ','ふ','へ','ほ'], 'm': ['ま','み','む','め','も'],
-    'y': ['や','ゆ','よ'], 'r': ['ら','り','る','れ','ろ'], 'w': ['わ','を']
-  };
-  return str.toLowerCase();
-}
-
-// 検索ワード正規化
 function normalizeSearchTerm(str) {
   if (!str) return '';
   return str.normalize('NFKC').replace(/[,，、/／]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -211,6 +205,10 @@ function lockBodyScroll(lock) {
     const hasOpenModal = !document.getElementById('modal').classList.contains('hidden') ||
                          !document.getElementById('settingsModal').classList.contains('hidden') ||
                          !document.getElementById('artistModal').classList.contains('hidden') ||
+                         !document.getElementById('moodModal').classList.contains('hidden') ||
+                         !document.getElementById('summaryModal').classList.contains('hidden') ||
+                         !document.getElementById('cardShareModal').classList.contains('hidden') ||
+                         !document.getElementById('cardViewModal').classList.contains('hidden') ||
                          !document.getElementById('filterSheetBackdrop').classList.contains('hidden');
     if (!hasOpenModal) {
       document.body.classList.remove('overflow-hidden');
@@ -258,25 +256,21 @@ window.resetAllFiltersInSheet = function() {
 };
 
 function syncFilterControlsVisual() {
-  // 年代
   document.querySelectorAll('#sheetDecadeTabs .decade-tab').forEach(b => {
     b.className = b.dataset.val === selectedDecade 
       ? 'decade-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0' 
       : 'decade-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0';
   });
-  // 習熟度
   document.querySelectorAll('#sheetScoreTabs .score-tab').forEach(b => {
     b.className = b.dataset.val === selectedScore 
       ? 'score-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0' 
       : 'score-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0';
   });
-  // キー
   document.querySelectorAll('#sheetAttrTabs .attr-tab').forEach(b => {
     b.className = b.dataset.val === selectedAttr 
       ? 'attr-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0' 
       : 'attr-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0';
   });
-  // 音域
   document.querySelectorAll('#sheetPitchTabs .pitch-tab').forEach(b => {
     b.className = b.dataset.val === selectedPitchRange 
       ? 'pitch-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0' 
@@ -609,17 +603,27 @@ window.saveBulkSongs = async function() {
 };
 
 // ==========================================
-// 設定 & AI音域連携（ローディング制御追加）
+// 設定 & AI音域連携
 // ==========================================
 window.openSettingsModal = function() {
   document.getElementById('migrateProgressText').classList.add('hidden');
   updateUnregisteredPitchCount();
+  const savedKey = localStorage.getItem('ohako_gemini_api_key') || '';
+  const keyInput = document.getElementById('geminiApiKeyInput');
+  if (keyInput) keyInput.value = savedKey;
+
   document.getElementById('settingsModal').classList.remove('hidden');
   lockBodyScroll(true);
 };
 window.closeSettingsModal = function() {
   document.getElementById('settingsModal').classList.add('hidden');
   lockBodyScroll(false);
+};
+
+window.saveGeminiApiKey = function() {
+  const val = document.getElementById('geminiApiKeyInput')?.value.trim() || '';
+  localStorage.setItem('ohako_gemini_api_key', val);
+  alert("Gemini APIキーを保存しました。");
 };
 
 function updateUnregisteredPitchCount() {
@@ -1489,7 +1493,7 @@ function updateToggleAllExpandButtonState() {
   icon.textContent = isAllExpanded ? '📕' : '📖';
 }
 
-// 検索マッチング判定（かな・カナ・英字・略称辞書・ローマ字を完全透過判定）
+// 検索マッチング判定（かな・カナ・英字・略称辞書・ローマ字）
 function matchSearchQuery(song, rawQuery) {
   if (!rawQuery) return true;
   const qLower = rawQuery.toLowerCase().trim();
@@ -1507,17 +1511,14 @@ function matchSearchQuery(song, rawQuery) {
     ...(song.tags || []).map(t => t.toLowerCase())
   ];
 
-  // 1. 通常の部分一致（大文字小文字無視）
   if (targets.some(t => t.includes(qLower))) return true;
 
-  // 2. カタカナ / ひらがな同一視判定
   const targetConcat = targets.join(' ');
   const targetKata = hiraToKata(targetConcat);
   const targetHira = kataToHira(targetConcat);
 
   if (targetKata.includes(qKata) || targetHira.includes(qHira)) return true;
 
-  // 3. アーティスト・エイリアス辞書照合（B'z, King Gnu, ヒゲダン等）
   const artistLower = (song.artist || '').toLowerCase();
   for (const [canonical, aliases] of Object.entries(ARTIST_ALIASES)) {
     if (artistLower.includes(canonical)) {
@@ -1566,7 +1567,7 @@ function getCurrentFilteredSongs() {
 }
 
 // ==========================================
-// マイリスト描画 (歌唱取消の常時横配置 & 習熟度UI)
+// マイリスト描画
 // ==========================================
 window.render = function() {
   const sortSelect = document.getElementById('sortSelect');
@@ -1645,7 +1646,6 @@ window.render = function() {
     return `
       <div class="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-sm transition overflow-hidden">
         <div class="p-3 flex items-center gap-2.5">
-          <!-- ジャケットタップで試聴再生 -->
           <div onclick="togglePlayPreview('${pUrl}', '${s.id}', '${escapeHtml(s.title)}', '${escapeHtml(s.artist)}')" class="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 cursor-pointer shadow border border-slate-800 bg-slate-800">
             ${s.artwork ? `<img src="${s.artwork}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-lg text-slate-600">🎵</div>`}
             <div class="absolute inset-0 bg-black/40 flex items-center justify-center transition ${isPlaying ? 'opacity-100 bg-rose-950/70' : 'opacity-0 hover:opacity-100'}">
@@ -1653,7 +1653,6 @@ window.render = function() {
             </div>
           </div>
 
-          <!-- 曲名タップで詳細開閉 -->
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-1.5 cursor-pointer" onclick="toggleExpandCard('${s.id}')">
               <div class="font-bold text-sm text-white truncate">${escapeHtml(s.title)}</div>
@@ -1676,7 +1675,6 @@ window.render = function() {
             </div>
           </div>
 
-          <!-- 操作ボタングループ（非展開時も歌唱取消をすぐ横に表示） -->
           <div class="flex flex-col items-end gap-1.5 shrink-0">
             <div class="flex items-center gap-1">
               ${hasUndo ? `
@@ -1769,7 +1767,7 @@ window.setAttrFilter = function(attr) {
 };
 
 // ==========================================
-// マイ分析ダッシュボード（実戦ロジック本格化）
+// マイ分析ダッシュボード
 // ==========================================
 function renderAnalysis() {
   const allSongs = window.songs || [];
@@ -1787,7 +1785,7 @@ function renderAnalysis() {
   const totalSing = activeSongs.reduce((acc, s) => acc + (s.singCount || 0), 0);
   document.getElementById('statTotalSingCount').textContent = `${totalSing}回`;
 
-  // 1. ボイスレンジ判定（鉄板最高音・安全圏 & 限界ボーダーライン）
+  // 1. ボイスレンジ判定
   const voiceRangeEl = document.getElementById('analysisVoiceRange');
   const validPitches = activeSongs.map(s => ({
     score: s.score,
@@ -1799,8 +1797,6 @@ function renderAnalysis() {
     const mastered = validPitches.filter(x => x.score === '得意');
     const safeMaxRank = mastered.length > 0 ? Math.max(...mastered.map(x => x.rank)) : 0;
     const allMaxRank = Math.max(...validPitches.map(x => x.rank));
-    
-    // 限界ボーダー（練習中率が跳ね上がる音域境界）
     const borderRank = safeMaxRank > 0 ? safeMaxRank + 1 : allMaxRank;
 
     voiceRangeEl.innerHTML = `
@@ -1821,7 +1817,7 @@ function renderAnalysis() {
     voiceRangeEl.innerHTML = '<span class="text-slate-500">音域データがまだありません（⚙️管理設定からAI一括取得が可能です）</span>';
   }
 
-  // 2. 年代別実戦力（帯グラフ + 重み付け戦力判定）
+  // 2. 年代別実戦力
   const decadeStrengthEl = document.getElementById('analysisDecadeStrength');
   const decades = [
     { key: '2020s', label: '2020年代（若手・最新）', min: 2020, max: 2099 },
@@ -1851,10 +1847,9 @@ function renderAnalysis() {
       `;
     }
 
-    // 重み付け実戦力計算: 得意=100%, 歌える=70%, 練習中=30%
     const weights = { '得意': 1.0, '歌える': 0.7, '練習中': 0.3 };
     const powerSum = songsInDec.reduce((acc, s) => acc + (weights[s.score] || 0.5), 0);
-    const maxPossible = Math.max(songsInDec.length, 3); // 3曲以上で100%基準
+    const maxPossible = Math.max(songsInDec.length, 3);
     const battleScorePercent = Math.min(Math.round((powerSum / maxPossible) * 100), 100);
 
     const barColor = battleScorePercent >= 75 ? 'bg-gradient-to-r from-emerald-500 to-teal-400' :
@@ -1874,7 +1869,7 @@ function renderAnalysis() {
     `;
   }).join('');
 
-  // 3. キー調整相関（原曲 vs キー変更のスコア改善効果）
+  // 3. キー調整相関
   const keyContainer = document.getElementById('analysisKeyScores');
   const effectBadge = document.getElementById('analysisKeyEffectBadge');
   
@@ -1917,7 +1912,7 @@ function renderAnalysis() {
     }).join('');
   }
 
-  // 4. アーティスト偏愛度 & ハイスコア相性
+  // 4. アーティスト偏愛度
   const artistAffinityEl = document.getElementById('analysisArtistAffinity');
   const artistMap = {};
   activeSongs.forEach(s => {
@@ -1969,7 +1964,7 @@ function renderAnalysis() {
     </div>
   `;
 
-  // 5. マンネリ度 & ご無沙汰アラート
+  // 5. マンネリ度
   const monotonyEl = document.getElementById('analysisMonotony');
   const threeMonthsAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
   const dormant = activeSongs.filter(s => {
@@ -1978,7 +1973,6 @@ function renderAnalysis() {
     return s.lastSungAt < threeMonthsAgo;
   }).slice(0, 3);
 
-  // マンネリ度（上位5曲が総歌唱回数に占める割合）
   const totalSingsAll = activeSongs.reduce((sum, s) => sum + (s.singCount || 0), 0);
   const sortedBySings = [...activeSongs].sort((a, b) => (b.singCount || 0) - (a.singCount || 0));
   const top5SingSum = sortedBySings.slice(0, 5).reduce((sum, s) => sum + (s.singCount || 0), 0);
@@ -2208,5 +2202,449 @@ window.pickRandom = function() {
 window.closeRandom = function() {
   document.getElementById('randomBanner').classList.add('hidden');
 };
+
+// ==========================================
+// 💡 空気読み選曲機能
+// ==========================================
+window.openMoodSuggestModal = function() {
+  currentMoodFlow = [];
+  activeMoodAttrs.clear();
+  syncMoodAttrVisual();
+  renderMoodFlowChain();
+  document.getElementById('moodSuggestResult').classList.add('hidden');
+  document.getElementById('moodSuggestResult').innerHTML = '';
+  document.getElementById('moodModal').classList.remove('hidden');
+  lockBodyScroll(true);
+};
+
+window.closeMoodSuggestModal = function() {
+  document.getElementById('moodModal').classList.add('hidden');
+  lockBodyScroll(false);
+};
+
+window.toggleMoodAttr = function(attrKey) {
+  if (activeMoodAttrs.has(attrKey)) activeMoodAttrs.delete(attrKey);
+  else activeMoodAttrs.add(attrKey);
+  syncMoodAttrVisual();
+};
+
+function syncMoodAttrVisual() {
+  const map = {
+    'ani': document.getElementById('moodAttr_ani'),
+    'vocaloid': document.getElementById('moodAttr_vocaloid'),
+    'nostalgia': document.getElementById('moodAttr_nostalgia'),
+    'trend': document.getElementById('moodAttr_trend')
+  };
+  for (const [k, el] of Object.entries(map)) {
+    if (!el) continue;
+    if (activeMoodAttrs.has(k)) {
+      el.className = "py-1.5 px-2 rounded-lg bg-indigo-600 text-white font-bold border border-indigo-500 text-left flex items-center gap-1 shadow-sm transition";
+    } else {
+      el.className = "py-1.5 px-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 text-left flex items-center gap-1 transition";
+    }
+  }
+}
+
+window.pushMoodStep = function(tensionLabel) {
+  const attrLabels = [];
+  if (activeMoodAttrs.has('ani')) attrLabels.push('🎬 アニソン');
+  if (activeMoodAttrs.has('vocaloid')) attrLabels.push('🤖 ボカロ');
+  if (activeMoodAttrs.has('nostalgia')) attrLabels.push('📻 懐メロ');
+  if (activeMoodAttrs.has('trend')) attrLabels.push('👶 最新');
+
+  const stepItem = {
+    attrs: [...attrLabels],
+    tension: tensionLabel,
+    display: (attrLabels.length ? attrLabels.join('') + ' ' : '') + tensionLabel
+  };
+  currentMoodFlow.push(stepItem);
+  renderMoodFlowChain();
+};
+
+function renderMoodFlowChain() {
+  const container = document.getElementById('moodFlowChain');
+  if (!container) return;
+  if (currentMoodFlow.length === 0) {
+    container.innerHTML = '<span class="text-slate-500 text-[11px]">下のボタンを押して流れを入力...</span>';
+    return;
+  }
+  container.innerHTML = currentMoodFlow.map((s, idx) => `
+    <span class="inline-flex items-center gap-1 bg-slate-900 border border-slate-700 text-slate-200 px-2 py-0.5 rounded-lg text-[10px] font-mono">
+      <span class="text-indigo-400 font-bold">${idx + 1}.</span>
+      <span>${escapeHtml(s.display)}</span>
+    </span>
+  `).join('<span class="text-slate-600 text-[10px]">➜</span>');
+}
+
+window.runMoodSuggest = async function() {
+  if (currentMoodFlow.length === 0) return alert("直前の空気を1曲以上タップしてください。");
+  const resultBox = document.getElementById('moodSuggestResult');
+  const btn = document.getElementById('btnRunMoodSuggest');
+
+  btn.disabled = true;
+  btn.classList.add('opacity-50');
+  resultBox.classList.remove('hidden');
+  resultBox.innerHTML = '<div class="text-center text-indigo-300 text-xs py-4">💡 部屋の空気を読み解き、持ち曲から最適な一手を考案中...</div>';
+
+  const myPlayable = (window.songs || []).filter(s => s.score === '得意' || s.score === '歌える');
+  const pool = myPlayable.length >= 3 ? myPlayable : (window.songs || []);
+
+  const flowSummary = currentMoodFlow.map((s, i) => `${i + 1}曲前: ${s.display}`).join('\n');
+  const songListText = pool.slice(0, 40).map(s => `- id:${s.id} / ${s.title} (${s.artist || '歌手不明'}) / 習熟度:${s.score} / 最高音:${s.maxPitch || '未設定'}`).join('\n');
+
+  const apiKey = localStorage.getItem('ohako_gemini_api_key') || '';
+  if (apiKey) {
+    try {
+      const prompt = `あなたはカラオケの超一流アシスタント・相棒です。
+以下のカラオケルームの【直近の曲の流れ】を分析し、ユーザーの【持ち曲リスト】の中から今歌うべきベストな3候補を決定してください。
+
+【直近の流れ】
+${flowSummary}
+
+【持ち曲候補リスト】
+${songListText}
+
+以下のJSON配列形式のみで出力してください。Markdown等の装飾は不要です。
+[
+  { "id": "曲のid", "category": "王道追随枠", "comment": "相棒としてのウィットに富んだ推薦理由（短め）" },
+  { "id": "曲のid", "category": "空気転換枠", "comment": "推薦理由" },
+  { "id": "曲のid", "category": "スパイス変化球枠", "comment": "推薦理由" }
+]`;
+
+      const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      const data = await res.json();
+      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const cleanJson = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
+      const suggestions = JSON.parse(cleanJson);
+
+      renderMoodResults(suggestions);
+      btn.disabled = false;
+      btn.classList.remove('opacity-50');
+      return;
+    } catch (e) {
+      console.warn("Gemini API fallback to local rule:", e);
+    }
+  }
+
+  // フォールバック（ルールベース）
+  const picked = [...pool].sort(() => 0.5 - Math.random()).slice(0, 3);
+  const categories = ["王道追随枠", "空気転換枠", "スパイス枠"];
+  const comments = [
+    "今の熱気をそのままキープして手堅く刺す十八番！",
+    "一旦喉を休めつつ、ガラッと空気を変える大人の選曲。",
+    "ここでこれ入れたら『懐かしい！』と全員が食いつく隠し球。"
+  ];
+  const localSuggestions = picked.map((s, idx) => ({
+    id: s.id,
+    category: categories[idx] || "おすすめ枠",
+    comment: comments[idx] || "間違いない一曲です！"
+  }));
+
+  renderMoodResults(localSuggestions);
+  btn.disabled = false;
+  btn.classList.remove('opacity-50');
+};
+
+function renderMoodResults(suggestions) {
+  const resultBox = document.getElementById('moodSuggestResult');
+  resultBox.innerHTML = suggestions.map(item => {
+    const s = (window.songs || []).find(x => x.id === item.id) || { title: 'おすすめ曲', artist: '' };
+    return `
+      <div class="p-2.5 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
+        <div class="flex items-center justify-between text-[10px]">
+          <span class="bg-indigo-950 text-indigo-300 border border-indigo-800 px-1.5 py-0.2 rounded font-bold">${escapeHtml(item.category)}</span>
+          <span class="text-slate-500 font-mono">${s.key === '0' ? '原曲キー' : s.key || ''}</span>
+        </div>
+        <div class="font-bold text-sm text-white truncate">${escapeHtml(s.title)} <span class="text-xs font-normal text-slate-400">/ ${escapeHtml(s.artist || '')}</span></div>
+        <p class="text-xs text-indigo-200 leading-relaxed bg-slate-900/60 p-2 rounded-lg border border-slate-800/80">
+          🗣️ 「${escapeHtml(item.comment)}」
+        </p>
+        <div class="flex justify-end gap-1.5 pt-1">
+          <button onclick="addToSetlist('${s.id}'); closeMoodSuggestModal();" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-indigo-300 px-2 py-1 rounded-md border border-slate-700">
+            ＋ ピックアップに追加
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ==========================================
+// 🤖 勝手にカラオケ総括・評論
+// ==========================================
+window.openSummaryModal = function() {
+  const todayStr = new Date().toISOString().split('T')[0];
+  const dateInput = document.getElementById('summaryTargetDate');
+  if (dateInput) dateInput.value = todayStr;
+
+  loadSummarySongsForDate();
+  document.getElementById('summaryResultArea').classList.add('hidden');
+  document.getElementById('summaryResultArea').innerHTML = '';
+  document.getElementById('summaryModal').classList.remove('hidden');
+  lockBodyScroll(true);
+};
+
+window.closeSummaryModal = function() {
+  document.getElementById('summaryModal').classList.add('hidden');
+  lockBodyScroll(false);
+};
+
+window.loadSummarySongsForDate = function() {
+  const dateStr = document.getElementById('summaryTargetDate')?.value;
+  if (!dateStr) return;
+
+  const targetStart = new Date(`${dateStr}T06:00:00`).getTime();
+  const nextDay = new Date(targetStart + 24 * 60 * 60 * 1000);
+  const targetEnd = nextDay.getTime();
+
+  summaryCandidateSongs = (window.songs || []).filter(s => {
+    if (!s.lastSungAt) return false;
+    return s.lastSungAt >= targetStart && s.lastSungAt < targetEnd;
+  }).sort((a, b) => (a.lastSungAt || 0) - (b.lastSungAt || 0));
+
+  renderSummaryCandidateList();
+};
+
+function renderSummaryCandidateList() {
+  const countEl = document.getElementById('summarySongCount');
+  const container = document.getElementById('summarySongList');
+  if (!container) return;
+
+  countEl.textContent = `${summaryCandidateSongs.length}曲 歌唱`;
+
+  if (summaryCandidateSongs.length === 0) {
+    container.innerHTML = '<div class="text-center text-slate-500 py-8 text-xs">この日歌われた曲の履歴がありません</div>';
+    return;
+  }
+
+  container.innerHTML = summaryCandidateSongs.map((s, idx) => `
+    <div class="flex items-center justify-between p-2 bg-slate-950 border border-slate-800 rounded-xl text-xs gap-2">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="font-mono text-indigo-400 font-bold w-4 text-center shrink-0">${idx + 1}</span>
+        <div class="min-w-0">
+          <div class="font-bold text-white truncate">${escapeHtml(s.title)}</div>
+          <div class="text-[10px] text-slate-400 truncate">${escapeHtml(s.artist || '')} • ${s.key === '0' ? '原曲' : 'キー ' + s.key} • 最高 ${escapeHtml(s.maxPitch || '--')}</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-1 shrink-0">
+        <button onclick="moveSummarySong(${idx}, -1)" ${idx === 0 ? 'disabled class="opacity-20 p-1"' : 'class="text-slate-400 hover:text-white p-1"'}>▲</button>
+        <button onclick="moveSummarySong(${idx}, 1)" ${idx === summaryCandidateSongs.length - 1 ? 'disabled class="opacity-20 p-1"' : 'class="text-slate-400 hover:text-white p-1"'}>▼</button>
+        <button onclick="removeSummarySong(${idx})" class="text-slate-500 hover:text-rose-400 p-1">✕</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+window.moveSummarySong = function(idx, dir) {
+  const target = idx + dir;
+  if (target < 0 || target >= summaryCandidateSongs.length) return;
+  const temp = summaryCandidateSongs[idx];
+  summaryCandidateSongs[idx] = summaryCandidateSongs[target];
+  summaryCandidateSongs[target] = temp;
+  renderSummaryCandidateList();
+};
+
+window.removeSummarySong = function(idx) {
+  summaryCandidateSongs.splice(idx, 1);
+  renderSummaryCandidateList();
+};
+
+window.generateAiSummary = async function() {
+  if (summaryCandidateSongs.length === 0) return alert("総括対象の曲がありません。");
+
+  const btn = document.getElementById('btnGenerateSummary');
+  const resultBox = document.getElementById('summaryResultArea');
+  btn.disabled = true;
+  btn.classList.add('opacity-50');
+  resultBox.classList.remove('hidden');
+  resultBox.innerHTML = '<div class="text-center text-indigo-300 text-xs py-4">✨ AI相棒が本日の歌唱を愛とユーモアたっぷりに執筆中...</div>';
+
+  const songRows = summaryCandidateSongs.map((s, i) => `${i + 1}. ${s.title} (${s.artist || '歌手不明'}) [キー:${s.key || '0'}, 最高音:${s.maxPitch || '未設定'}, 習熟度:${s.score || '不明'}]`).join('\n');
+  const apiKey = localStorage.getItem('ohako_gemini_api_key') || '';
+
+  if (apiKey) {
+    try {
+      const prompt = `あなたはカラオケの辛口かつ愛情深い専属マネージャー（相棒）です。
+本日のカラオケ歌唱リストを分析し、以下のフォーマットでウィットに富んだ総括レポートを作成してください。
+
+【本日の歌唱リスト（歌った順）】
+${songRows}
+
+【出力フォーマット】
+■ 本日のセトリ二つ名（称号）
+（例: 「喉酷使！hiA乱れ打ちギグ」「2000年代J-POP亡霊セトリ」のようなパンチの効いたタイトル）
+
+■ 相棒からの辛口＆愛あるレビュー
+（曲順のドラマ、高音の無茶、キー調整のファインプレー、世代感などを鋭くユーモラスに講評・300字程度）
+
+■ 本日のMVP曲 & 労いの一言`;
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      const data = await res.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      resultBox.innerHTML = `<div class="whitespace-pre-wrap leading-relaxed text-indigo-100">${escapeHtml(text)}</div>`;
+      btn.disabled = false;
+      btn.classList.remove('opacity-50');
+      return;
+    } catch (e) {
+      console.warn("AI summary fallback:", e);
+    }
+  }
+
+  // フォールバック
+  const titles = summaryCandidateSongs.map(s => s.title);
+  resultBox.innerHTML = `
+    <div class="space-y-1.5 text-xs text-indigo-100">
+      <div class="font-bold text-amber-400 text-sm">🏆 称号: 『名曲乱れ打ち！全力十八番ナイト』</div>
+      <p class="leading-relaxed">
+        全${summaryCandidateSongs.length}曲を完走！「${escapeHtml(titles[0] || '')}」からスタートし、ラストを「${escapeHtml(titles[titles.length - 1] || '')}」で締めくくる見事な構成でした。
+        喉のスタミナ配分も素晴らしく、相棒としても頼もしい実戦記録です。お疲れ様でした！
+      </p>
+    </div>
+  `;
+  btn.disabled = false;
+  btn.classList.remove('opacity-50');
+};
+
+// ==========================================
+// 📇 私の十八番名刺（シェア）
+// ==========================================
+let currentCardScope = 'mastered';
+
+window.openCardShareModal = function() {
+  selectCardScope('mastered');
+  document.getElementById('cardShareModal').classList.remove('hidden');
+  lockBodyScroll(true);
+};
+
+window.closeCardShareModal = function() {
+  document.getElementById('cardShareModal').classList.add('hidden');
+  lockBodyScroll(false);
+};
+
+window.selectCardScope = function(scope) {
+  currentCardScope = scope;
+  ['mastered', 'main', 'all', 'pickup'].forEach(k => {
+    const el = document.getElementById(`cardScope_${k}`);
+    if (!el) return;
+    if (k === scope) {
+      el.className = "py-2 px-2.5 rounded-xl bg-indigo-600 text-white font-bold border border-indigo-500 text-left transition shadow";
+    } else {
+      el.className = "py-2 px-2.5 rounded-xl bg-slate-950 text-slate-300 border border-slate-800 text-left transition";
+    }
+  });
+
+  generateCardShareLink();
+};
+
+function generateCardShareLink() {
+  let targetSongs = [];
+  if (currentCardScope === 'mastered') {
+    targetSongs = (window.songs || []).filter(s => s.score === '得意');
+  } else if (currentCardScope === 'main') {
+    targetSongs = (window.songs || []).filter(s => s.score === '得意' || s.score === '歌える');
+  } else if (currentCardScope === 'all') {
+    targetSongs = window.songs || [];
+  } else if (currentCardScope === 'pickup') {
+    targetSongs = setlist.map(id => (window.songs || []).find(s => s.id === id)).filter(Boolean);
+  }
+
+  document.getElementById('cardShareCountBadge').textContent = `${targetSongs.length}曲`;
+
+  const miniData = targetSongs.map(s => [
+    s.title || '',
+    s.artist || '',
+    s.key || '0',
+    s.score || 'これから',
+    s.previewUrl || ''
+  ]);
+
+  const jsonStr = JSON.stringify(miniData);
+  const base64Data = btoa(encodeURIComponent(jsonStr));
+  const url = `${window.location.origin}${window.location.pathname}#card=${base64Data}`;
+
+  const input = document.getElementById('cardShareUrlInput');
+  if (input) input.value = url;
+}
+
+window.copyCardShareUrl = function() {
+  const input = document.getElementById('cardShareUrlInput');
+  if (!input || !input.value) return;
+  navigator.clipboard.writeText(input.value).then(() => {
+    const btn = document.getElementById('btnCopyCardUrl');
+    const orig = btn.textContent;
+    btn.textContent = "✅ 完了";
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  });
+};
+
+function checkAndOpenSharedCard() {
+  const hash = window.location.hash;
+  if (!hash.startsWith('#card=')) return;
+
+  try {
+    const base64 = hash.replace('#card=', '');
+    const jsonStr = decodeURIComponent(atob(base64));
+    const list = JSON.parse(jsonStr);
+
+    if (Array.isArray(list)) {
+      renderCardViewScreen(list);
+    }
+  } catch (e) {
+    console.error("名刺データの解析に失敗しました:", e);
+  }
+}
+
+function renderCardViewScreen(list) {
+  const modal = document.getElementById('cardViewModal');
+  const container = document.getElementById('cardViewList');
+  const subEl = document.getElementById('cardViewSubtitle');
+
+  subEl.textContent = `全 ${list.length} 曲のレパートリー`;
+  container.innerHTML = list.map((item, idx) => {
+    const [title, artist, key, score, previewUrl] = item;
+    const playId = `card_view_${idx}`;
+    const isPlaying = currentPlayingId === playId;
+
+    return `
+      <div class="flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs gap-2">
+        <div class="min-w-0 flex-1">
+          <div class="font-bold text-white text-sm truncate">${escapeHtml(title)}</div>
+          <div class="text-xs text-slate-400 truncate mt-0.5">${escapeHtml(artist || '歌手未設定')}</div>
+          <div class="flex items-center gap-1.5 mt-1 text-[10px]">
+            <span class="bg-slate-950 border border-slate-800 px-1.5 py-0.2 rounded font-mono text-indigo-300">${key === '0' ? '原曲' : 'キー ' + key}</span>
+            <span class="bg-indigo-950/80 border border-indigo-800 text-indigo-300 px-1.5 py-0.2 rounded">${escapeHtml(score)}</span>
+          </div>
+        </div>
+        ${previewUrl ? `
+          <button onclick="togglePlayPreview('${previewUrl}', '${playId}', '${escapeHtml(title)}', '${escapeHtml(artist)}')" class="shrink-0 bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-bold">
+            ${isPlaying ? '⏹ 停止' : '▶ 試聴'}
+          </button>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+
+  modal.classList.remove('hidden');
+  lockBodyScroll(true);
+}
+
+window.closeCardView = function() {
+  document.getElementById('cardViewModal').classList.add('hidden');
+  window.location.hash = '';
+  lockBodyScroll(false);
+};
+
+window.addEventListener('DOMContentLoaded', () => {
+  checkAndOpenSharedCard();
+});
 
 render();
