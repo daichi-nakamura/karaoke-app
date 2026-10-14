@@ -3,17 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>マイカラオケリスト</title>
+  <title>OHAKO</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { -webkit-tap-highlight-color: transparent; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .bottom-sheet { transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen pb-32 font-sans select-none">
 
-  <!-- ヘッダー -->
+  <!-- ヘッダー (OHAKO名称 / ピックアップ・追加・設定ボタンは完全維持) -->
   <header class="sticky top-0 z-20 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-3.5 py-2 space-y-2">
     <div class="max-w-md mx-auto flex items-center justify-between gap-2">
       <div class="flex items-center gap-2 min-w-0">
@@ -23,7 +24,7 @@
           </svg>
         </div>
         <h1 class="font-extrabold text-sm tracking-tight text-white whitespace-nowrap truncate">
-          マイカラオケ<span class="text-indigo-400">リスト</span>
+          OHAKO
         </h1>
       </div>
       <div class="flex items-center gap-1.5 shrink-0">
@@ -40,8 +41,8 @@
       </div>
     </div>
 
-    <!-- 3分割メインナビゲーション -->
-    <div class="max-w-md mx-auto grid grid-cols-3 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+    <!-- 4分割メインナビゲーション (マイ分析タブを追加) -->
+    <div class="max-w-md mx-auto grid grid-cols-4 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
       <button id="navTabMyList" onclick="switchMainTab('mylist')" class="py-1.5 rounded-lg font-bold transition bg-indigo-600 text-white shadow text-center truncate">
         マイリスト
       </button>
@@ -51,6 +52,9 @@
       <button id="navTabRanking" onclick="switchMainTab('ranking')" class="py-1.5 rounded-lg font-bold transition text-slate-400 hover:text-white text-center truncate">
         🔥 流行チャート
       </button>
+      <button id="navTabAnalysis" onclick="switchMainTab('analysis')" class="py-1.5 rounded-lg font-bold transition text-slate-400 hover:text-white text-center truncate">
+        📊 マイ分析
+      </button>
     </div>
   </header>
 
@@ -58,62 +62,19 @@
   <main id="viewMyList" class="max-w-md mx-auto p-4 space-y-2.5">
     <div id="statusBanner" class="hidden text-xs p-2.5 rounded-xl border"></div>
 
-    <!-- 検索バー -->
-    <div class="flex gap-2">
-      <input type="text" id="searchInput" oninput="render()" placeholder="曲名・歌手・タグ・音域等で検索..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm placeholder:text-slate-500 text-slate-100 focus:outline-none focus:border-indigo-500">
-      <button onclick="pickRandom()" class="bg-slate-900 border border-slate-800 px-3.5 py-2.5 rounded-xl text-lg hover:bg-slate-800 transition shrink-0" title="ランダム選曲">🎲</button>
-    </div>
-
-    <!-- フィルターエリア -->
-    <div class="space-y-1.5">
-      <!-- 1. 年代別（10年刻み細分化） -->
-      <div class="flex gap-1 overflow-x-auto no-scrollbar text-xs" id="decadeTabs">
-        <button onclick="setDecadeFilter('all')" class="decade-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0" data-val="all">全年代</button>
-        <button onclick="setDecadeFilter('2020s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="2020s">2020年代</button>
-        <button onclick="setDecadeFilter('2010s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="2010s">2010年代</button>
-        <button onclick="setDecadeFilter('2000s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="2000s">2000年代</button>
-        <button onclick="setDecadeFilter('1990s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="1990s">1990年代</button>
-        <button onclick="setDecadeFilter('1980s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="1980s">1980年代</button>
-        <button onclick="setDecadeFilter('1970s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="1970s">1970年代以前</button>
+    <!-- 上部検索 & パターンA: 絞り込みボタン & チップ表示エリア -->
+    <div class="space-y-2">
+      <div class="flex gap-2">
+        <input type="text" id="searchInput" oninput="render()" placeholder="曲名・歌手・タグ・音域等で検索..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm placeholder:text-slate-500 text-slate-100 focus:outline-none focus:border-indigo-500">
+        <button onclick="pickRandom()" class="bg-slate-900 border border-slate-800 px-3 py-2.5 rounded-xl text-base hover:bg-slate-800 transition shrink-0" title="ランダム選曲">🎲</button>
+        <button onclick="openFilterSheet()" class="bg-slate-900 hover:bg-slate-800 border border-slate-800 px-3 py-2.5 rounded-xl text-xs font-bold text-indigo-300 flex items-center gap-1.5 transition shrink-0">
+          <span>⚙️ 絞り込み</span>
+          <span id="activeFilterBadge" class="hidden bg-indigo-600 text-white text-[9px] px-1.5 py-0.2 rounded-full font-mono">0</span>
+        </button>
       </div>
 
-      <!-- 2. キー属性 & デュエット -->
-      <div class="flex gap-1 overflow-x-auto no-scrollbar text-[11px]" id="attrTabs">
-        <button onclick="setAttrFilter('all')" class="attr-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0" data-val="all">キー全般</button>
-        <button onclick="setAttrFilter('original')" class="attr-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="original">原曲キー</button>
-        <button onclick="setAttrFilter('plus')" class="attr-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="plus">＋キー</button>
-        <button onclick="setAttrFilter('minus')" class="attr-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="minus">−キー</button>
-        <button onclick="setAttrFilter('duet')" class="attr-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="duet">👥 デュエット</button>
-      </div>
-
-      <!-- 3. ジャンル別 -->
-      <div id="genreFilterList" class="flex gap-1 overflow-x-auto no-scrollbar text-xs"></div>
-
-      <!-- 4. 完成度フィルター -->
-      <div class="flex gap-1 overflow-x-auto no-scrollbar py-0.5 text-xs" id="scoreTabs">
-        <button onclick="setScoreFilter('all')" class="score-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0" data-val="all">すべて</button>
-        <button onclick="setScoreFilter('得意')" class="score-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="得意">得意</button>
-        <button onclick="setScoreFilter('歌える')" class="score-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="歌える">歌える</button>
-        <button onclick="setScoreFilter('練習中')" class="score-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="練習中">練習中</button>
-      </div>
-
-      <!-- 5. タグ別 -->
-      <div class="space-y-1 bg-slate-900/40 p-2 rounded-xl border border-slate-800">
-        <div class="flex items-center justify-between px-1">
-          <div class="text-[10px] text-slate-400 font-semibold flex items-center gap-1.5">
-            <span>🏷️ タグ絞り込み</span>
-            <span id="selectedTagBadge" class="hidden bg-indigo-600 text-white text-[9px] px-1.5 py-0.2 rounded-full font-mono">0</span>
-          </div>
-          <div class="flex items-center gap-2 text-[10px]">
-            <div class="flex bg-slate-950 rounded border border-slate-800 p-0.5">
-              <button id="tagModeAnd" onclick="setTagFilterMode('AND')" class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-600 text-white">AND</button>
-              <button id="tagModeOr" onclick="setTagFilterMode('OR')" class="px-1.5 py-0.5 rounded text-[9px] text-slate-400 hover:text-white">OR</button>
-            </div>
-            <button onclick="clearSelectedTags()" class="text-slate-500 hover:text-slate-300">クリア</button>
-          </div>
-        </div>
-        <div id="tagFilterList" class="flex gap-1.5 overflow-x-auto no-scrollbar text-xs pt-1"></div>
-      </div>
+      <!-- 適用中の条件チップ -->
+      <div id="activeFilterChipsContainer" class="flex flex-wrap items-center gap-1.5 text-xs min-h-[20px]"></div>
     </div>
 
     <!-- ソート・全展開・カウント -->
@@ -151,12 +112,12 @@
     <div id="songList" class="space-y-2.5"></div>
   </main>
 
-  <!-- ==================== 2. あなたへのおすすめ発掘画面 ==================== -->
+  <!-- ==================== 2. 名曲発掘画面 ==================== -->
   <main id="viewRecommend" class="max-w-md mx-auto p-4 space-y-3.5 hidden">
     <div class="flex items-center justify-between">
       <div>
-        <h2 class="font-bold text-base text-white">✨ 名曲発掘 & 数珠つなぎ</h2>
-        <p class="text-[11px] text-slate-400">同系統アーティストや、あの頃のアニメ・ドラマ曲を発掘</p>
+        <h2 class="font-bold text-base text-white">✨ 名曲発掘</h2>
+        <p class="text-[11px] text-slate-400">登録曲の傾向から、次のレパートリーを連想リコメンド</p>
       </div>
       <button onclick="analyzeAndRecommend()" class="text-xs text-indigo-400 bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg hover:bg-slate-800 shrink-0 whitespace-nowrap">
         🔄 再発掘
@@ -177,7 +138,6 @@
     <div class="flex items-center justify-between">
       <div>
         <h2 class="font-bold text-base text-white">🔥 Apple Music 日本トップソング</h2>
-        <p class="text-[11px] text-slate-400">ジャケットタップで30秒試聴できます</p>
       </div>
       <button onclick="loadRanking()" class="text-xs text-indigo-400 bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg hover:bg-slate-800 shrink-0 whitespace-nowrap">
         🔄 更新
@@ -189,7 +149,146 @@
     </div>
   </main>
 
-  <!-- ピックアップ管理ドロワー -->
+  <!-- ==================== 4. マイ分析画面 ==================== -->
+  <main id="viewAnalysis" class="max-w-md mx-auto p-4 space-y-3.5 hidden">
+    <div>
+      <h2 class="font-bold text-base text-white">📊 マイ分析ダッシュボード</h2>
+      <p class="text-[11px] text-slate-400">「これから」を除いた主力レパートリーの傾向と健康診断</p>
+    </div>
+
+    <!-- スタッツサマリー -->
+    <div class="grid grid-cols-2 gap-2 text-center text-xs">
+      <div class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl">
+        <div class="text-[10px] text-slate-400">有効レパートリー</div>
+        <div id="statActiveCount" class="text-base font-bold text-white mt-0.5">0曲</div>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl">
+        <div class="text-[10px] text-slate-400">平均スコア</div>
+        <div id="statAvgScore" class="text-base font-bold text-emerald-400 mt-0.5">--</div>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl">
+        <div class="text-[10px] text-slate-400">90点以上の鉄板曲</div>
+        <div id="statOver90Count" class="text-base font-bold text-amber-400 mt-0.5">0曲</div>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl">
+        <div class="text-[10px] text-slate-400">総歌唱数</div>
+        <div id="statTotalSingCount" class="text-base font-bold text-indigo-400 mt-0.5">0回</div>
+      </div>
+    </div>
+
+    <!-- 得意音域レンジ -->
+    <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-1">
+      <div class="text-[11px] font-bold text-indigo-400">🎤 マイ・ボイスレンジ（得意音域）</div>
+      <div id="analysisVoiceRange" class="text-xs text-slate-200">集計中...</div>
+    </div>
+
+    <!-- キー別平均スコア -->
+    <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-1.5">
+      <div class="text-[11px] font-bold text-indigo-400">🎯 キー調整と平均スコア</div>
+      <div id="analysisKeyScores" class="space-y-1 text-xs">集計中...</div>
+    </div>
+
+    <!-- ご無沙汰曲 & ヘビロテ -->
+    <div class="space-y-2">
+      <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-1.5">
+        <div class="text-[11px] font-bold text-amber-400">⚠️ ご無沙汰な十八番（3ヶ月以上未歌唱）</div>
+        <div id="analysisDormantSongs" class="space-y-1 text-xs">データなし</div>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-1.5">
+        <div class="text-[11px] font-bold text-indigo-300">🔥 最多歌唱 Top 5</div>
+        <div id="analysisMostSung" class="space-y-1 text-xs">データなし</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ==================== 絞り込みボトムシート (パターンA) ==================== -->
+  <div id="filterSheetBackdrop" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+    <div id="filterSheet" class="bottom-sheet absolute bottom-0 inset-x-0 bg-slate-900 border-t border-slate-800 rounded-t-2xl p-4 max-h-[85vh] overflow-y-auto max-w-md mx-auto transform translate-y-full space-y-3.5">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+        <div class="flex items-center gap-1.5">
+          <span class="text-base">⚙️</span>
+          <h3 class="font-bold text-sm text-white">詳細絞り込み</h3>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="resetAllFiltersInSheet()" class="text-xs text-slate-400 hover:text-white">リセット</button>
+          <button onclick="closeFilterSheet()" class="text-slate-400 hover:text-white text-sm p-1">✕</button>
+        </div>
+      </div>
+
+      <!-- 1. 年代 -->
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-400 mb-1">年代</label>
+        <div class="flex gap-1 overflow-x-auto no-scrollbar text-xs" id="sheetDecadeTabs">
+          <button onclick="setDecadeFilter('all')" class="decade-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0" data-val="all">全年代</button>
+          <button onclick="setDecadeFilter('2020s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="2020s">2020年代</button>
+          <button onclick="setDecadeFilter('2010s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="2010s">2010年代</button>
+          <button onclick="setDecadeFilter('2000s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="2000s">2000年代</button>
+          <button onclick="setDecadeFilter('1990s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="1990s">1990年代</button>
+          <button onclick="setDecadeFilter('1980s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="1980s">1980年代</button>
+          <button onclick="setDecadeFilter('1970s')" class="decade-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="1970s">1970年代以前</button>
+        </div>
+      </div>
+
+      <!-- 2. 完成度 (「これから」追加) -->
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-400 mb-1">完成度ステータス</label>
+        <div class="flex gap-1 overflow-x-auto no-scrollbar text-xs" id="sheetScoreTabs">
+          <button onclick="setScoreFilter('all')" class="score-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0" data-val="all">すべて</button>
+          <button onclick="setScoreFilter('得意')" class="score-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="得意">得意</button>
+          <button onclick="setScoreFilter('歌える')" class="score-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="歌える">歌える</button>
+          <button onclick="setScoreFilter('練習中')" class="score-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="練習中">練習中</button>
+          <button onclick="setScoreFilter('これから')" class="score-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="これから">これから</button>
+        </div>
+      </div>
+
+      <!-- 3. キー属性 (シンプル化) -->
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-400 mb-1">キー設定</label>
+        <div class="flex gap-1 overflow-x-auto no-scrollbar text-[11px]" id="sheetAttrTabs">
+          <button onclick="setAttrFilter('all')" class="attr-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0" data-val="all">全般</button>
+          <button onclick="setAttrFilter('original')" class="attr-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="original">原曲キー</button>
+          <button onclick="setAttrFilter('adjusted')" class="attr-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="adjusted">キー調整あり</button>
+          <button onclick="setAttrFilter('duet')" class="attr-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="duet">👥 デュエット</button>
+        </div>
+      </div>
+
+      <!-- 4. 音域帯（直感ラベル方式） -->
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-400 mb-1">最高音の高さ帯</label>
+        <div class="flex gap-1 overflow-x-auto no-scrollbar text-xs" id="sheetPitchTabs">
+          <button onclick="setPitchFilter('all')" class="pitch-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0" data-val="all">全音域</button>
+          <button onclick="setPitchFilter('low')" class="pitch-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="low">低め (~mid2E)</button>
+          <button onclick="setPitchFilter('normal')" class="pitch-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="normal">標準 (mid2F~G)</button>
+          <button onclick="setPitchFilter('high')" class="pitch-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="high">高め (mid2G#~hiA)</button>
+          <button onclick="setPitchFilter('ultra')" class="pitch-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="ultra">超高音 (hiA#~)</button>
+        </div>
+      </div>
+
+      <!-- 5. タグ別 -->
+      <div class="space-y-1 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
+        <div class="flex items-center justify-between px-1">
+          <div class="text-[10px] text-slate-400 font-semibold flex items-center gap-1.5">
+            <span>🏷️ タグ</span>
+            <span id="selectedTagBadge" class="hidden bg-indigo-600 text-white text-[9px] px-1.5 py-0.2 rounded-full font-mono">0</span>
+          </div>
+          <div class="flex items-center gap-2 text-[10px]">
+            <div class="flex bg-slate-900 rounded border border-slate-800 p-0.5">
+              <button id="tagModeAnd" onclick="setTagFilterMode('AND')" class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-600 text-white">AND</button>
+              <button id="tagModeOr" onclick="setTagFilterMode('OR')" class="px-1.5 py-0.5 rounded text-[9px] text-slate-400 hover:text-white">OR</button>
+            </div>
+            <button onclick="clearSelectedTags()" class="text-slate-500 hover:text-slate-300">クリア</button>
+          </div>
+        </div>
+        <div id="tagFilterList" class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto no-scrollbar pt-1"></div>
+      </div>
+
+      <button onclick="closeFilterSheet()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl font-bold text-xs shadow-md transition">
+        この条件を適用する
+      </button>
+    </div>
+  </div>
+
+  <!-- ピックアップ管理ドロワー (完全維持) -->
   <div id="setlistDrawer" class="fixed inset-x-0 bottom-0 z-40 bg-slate-900/98 backdrop-blur border-t border-slate-800 p-4 transform translate-y-full transition-transform duration-300 max-w-md mx-auto rounded-t-2xl shadow-2xl space-y-3">
     <div class="flex justify-between items-center border-b border-slate-800 pb-2">
       <div>
@@ -208,12 +307,32 @@
     <div id="setlistItems" class="max-h-60 overflow-y-auto no-scrollbar space-y-2"></div>
   </div>
 
-  <!-- 管理設定モーダル -->
+  <!-- 管理設定モーダル (AI音域連携セクションを追加) -->
   <div id="settingsModal" class="fixed inset-0 z-50 bg-black/80 hidden flex items-center justify-center p-4 overflow-y-auto">
     <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-5 shadow-2xl my-auto space-y-4">
       <div class="flex justify-between items-center border-b border-slate-800 pb-2.5">
         <h2 class="text-base font-bold flex items-center gap-1.5 text-white">⚙️ 管理・メンテナンス設定</h2>
         <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-white text-sm p-1">✕</button>
+      </div>
+
+      <!-- AI音域補完セクション -->
+      <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-indigo-400 flex items-center gap-1">🤖 AIで音域を一括登録</span>
+          <span id="unregisteredPitchCountBadge" class="text-[10px] text-amber-400 bg-amber-950/60 border border-amber-800/80 px-1.5 py-0.2 rounded-full font-mono">未登録: 0曲</span>
+        </div>
+        <p class="text-[11px] text-slate-400 leading-relaxed">
+          未設定の曲を抽出し、AIに調査させるプロンプトを生成します。回答JSONを貼り付けて一括反映できます。
+        </p>
+        <button onclick="copyAiPitchPrompt()" class="w-full bg-slate-800 hover:bg-slate-700 text-indigo-300 py-1.5 rounded-lg text-xs font-medium border border-slate-700 flex items-center justify-center gap-1">
+          📋 AI用プロンプトをコピー
+        </button>
+        <div class="pt-1 space-y-1">
+          <textarea id="aiPitchJsonInput" rows="3" placeholder='AIの回答JSONを貼り付け&#10;[{"id":"...", "maxPitch":"hiA", "minPitch":"mid1D"}]' class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white placeholder:text-slate-600 font-mono"></textarea>
+          <button onclick="applyAiPitchJson()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-1.5 rounded-lg text-xs font-bold transition">
+            📥 音域データを反映
+          </button>
+        </div>
       </div>
 
       <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-2">
@@ -259,7 +378,7 @@
     </div>
   </div>
 
-  <!-- 追加・編集モーダル -->
+  <!-- 追加・編集モーダル (単曲/一括切替構造は完全維持 + 「これから」追加) -->
   <div id="modal" class="fixed inset-0 z-50 bg-black/80 hidden flex items-center justify-center p-3 overflow-y-auto">
     <div class="bg-slate-900 border border-slate-800 w-full max-w-md max-h-[92vh] flex flex-col rounded-2xl p-4 shadow-2xl my-auto space-y-3">
       
@@ -366,7 +485,8 @@
               <select id="formScore" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 focus:outline-none">
                 <option value="得意">得意</option>
                 <option value="歌える">歌える</option>
-                <option value="練習中" selected>練習中</option>
+                <option value="練習中">練習中</option>
+                <option value="これから" selected>これから</option>
               </select>
             </div>
             <div>
@@ -405,7 +525,7 @@
         </form>
       </div>
 
-      <!-- パネルB: まとめて一括登録 -->
+      <!-- パネルB: まとめて一括登録 (初期選択に「これから」を追加) -->
       <div id="modalPanelBulk" class="space-y-3 overflow-y-auto no-scrollbar flex-1 flex flex-col min-h-0">
         <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 text-[11px] text-slate-400 space-y-1 shrink-0">
           <div class="text-indigo-400 font-bold">📋 曲名リストを貼り付けて一括取得</div>
@@ -436,6 +556,7 @@
               <span class="text-[10px] text-slate-500">一括完成度:</span>
               <select onchange="bulkSetAllScore(this.value)" class="bg-slate-950 border border-slate-800 text-slate-300 text-[10px] rounded px-1.5 py-0.5 focus:outline-none">
                 <option value="keep">変更なし</option>
+                <option value="これから" selected>全件: これから</option>
                 <option value="練習中">全件: 練習中</option>
                 <option value="歌える">全件: 歌える</option>
                 <option value="得意">全件: 得意</option>
@@ -457,7 +578,7 @@
     </div>
   </div>
 
-  <!-- アーティストディスコグラフィ全件モーダル -->
+  <!-- アーティストディスコグラフィ全件モーダル (完全維持) -->
   <div id="artistModal" class="fixed inset-0 z-50 bg-black/80 hidden flex items-center justify-center p-3 overflow-y-auto">
     <div class="bg-slate-900 border border-slate-800 w-full max-w-md max-h-[92vh] flex flex-col rounded-2xl p-4 shadow-2xl my-auto space-y-3">
       <div class="flex items-center justify-between border-b border-slate-800 pb-2.5 shrink-0">
