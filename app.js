@@ -7,12 +7,12 @@ let bulkCandidateSongs = [];
 let artistDiscographySongs = [];
 let setlist = JSON.parse(localStorage.getItem('karaoke_setlist')) || [];
 
-let selectedGenre = null;
 let selectedTags = new Set();
 let tagFilterMode = 'AND';
 let selectedScore = 'all';
 let selectedDecade = 'all';
 let selectedAttr = 'all';
+let selectedPitchRange = 'all';
 
 let expandedCardIds = new Set();
 let isAllExpanded = false;
@@ -43,17 +43,38 @@ const TIE_UP_PRESETS = [
   { title: 'ミュージック・アワー', artist: 'ポルノグラフィティ', year: '2000', tieUp: '🥤 ポカリスエットCMソング' }
 ];
 
-// 検索ワードの正規化（全角英数記号の正規化、余計な記号の置換）
-function normalizeSearchTerm(str) {
-  if (!str) return '';
-  return str
-    .normalize('NFKC')
-    .replace(/[,，、/／]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+// 音域判定ヘルパー
+const PITCH_RANK = {
+  "lowA": 10, "lowB": 12, "mid1C": 13, "mid1D": 15, "mid1E": 17, "mid1F": 18, "mid1G": 20,
+  "mid2A": 22, "mid2B": 24, "mid2C": 25, "mid2D": 27, "mid2E": 29, 
+  "mid2F": 30, "mid2F#": 31, "mid2G": 32, "mid2G#": 33, 
+  "hiA": 34, "hiA#": 35, "hiB": 36, "hiC": 37, "hiC#": 38, "hiD": 39, "hiE": 41
+};
+
+function getPitchRank(pitch) {
+  if (!pitch) return 0;
+  return PITCH_RANK[pitch.trim()] || 0;
 }
 
-// 安定したiTunes API通信（パラメータ最適化・強固なJSONPフォールバック）
+function matchPitchRange(maxPitch, rangeKey) {
+  if (rangeKey === "all") return true;
+  const rank = getPitchRank(maxPitch);
+  if (rank === 0) return false;
+  switch (rangeKey) {
+    case "low": return rank <= 29;
+    case "normal": return rank >= 30 && rank <= 32;
+    case "high": return rank >= 33 && rank <= 34;
+    case "ultra": return rank >= 35;
+    default: return true;
+  }
+}
+
+// 検索ワード正規化
+function normalizeSearchTerm(str) {
+  if (!str) return '';
+  return str.normalize('NFKC').replace(/[,，、/／]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 function fetchITunesApi(term, limit = 50) {
   const normalized = normalizeSearchTerm(term);
   const cleanTerm = encodeURIComponent(normalized);
@@ -139,13 +160,144 @@ function lockBodyScroll(lock) {
   } else {
     const hasOpenModal = !document.getElementById('modal').classList.contains('hidden') ||
                          !document.getElementById('settingsModal').classList.contains('hidden') ||
-                         !document.getElementById('artistModal').classList.contains('hidden');
+                         !document.getElementById('artistModal').classList.contains('hidden') ||
+                         !document.getElementById('filterSheetBackdrop').classList.contains('hidden');
     if (!hasOpenModal) {
       document.body.classList.remove('overflow-hidden');
     }
   }
 }
 
+// ==========================================
+// パターンA: 絞り込みボトムシート制御
+// ==========================================
+window.openFilterSheet = function() {
+  const backdrop = document.getElementById('filterSheetBackdrop');
+  const sheet = document.getElementById('filterSheet');
+  backdrop.classList.remove('hidden');
+  requestAnimationFrame(() => {
+    backdrop.classList.remove('opacity-0');
+    sheet.classList.remove('translate-y-full');
+  });
+  lockBodyScroll(true);
+};
+
+window.closeFilterSheet = function() {
+  const backdrop = document.getElementById('filterSheetBackdrop');
+  const sheet = document.getElementById('filterSheet');
+  backdrop.classList.add('opacity-0');
+  sheet.classList.add('translate-y-full');
+  setTimeout(() => {
+    backdrop.classList.add('hidden');
+    lockBodyScroll(false);
+  }, 300);
+};
+
+document.getElementById('filterSheetBackdrop')?.addEventListener('click', (e) => {
+  if (e.target.id === 'filterSheetBackdrop') closeFilterSheet();
+});
+
+window.resetAllFiltersInSheet = function() {
+  selectedDecade = 'all';
+  selectedScore = 'all';
+  selectedAttr = 'all';
+  selectedPitchRange = 'all';
+  selectedTags.clear();
+  syncFilterControlsVisual();
+  render();
+};
+
+function syncFilterControlsVisual() {
+  // 年代
+  document.querySelectorAll('#sheetDecadeTabs .decade-tab').forEach(b => {
+    b.className = b.dataset.val === selectedDecade 
+      ? 'decade-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0' 
+      : 'decade-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0';
+  });
+  // 完成度
+  document.querySelectorAll('#sheetScoreTabs .score-tab').forEach(b => {
+    b.className = b.dataset.val === selectedScore 
+      ? 'score-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0' 
+      : 'score-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0';
+  });
+  // キー
+  document.querySelectorAll('#sheetAttrTabs .attr-tab').forEach(b => {
+    b.className = b.dataset.val === selectedAttr 
+      ? 'attr-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0' 
+      : 'attr-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0';
+  });
+  // 音域
+  document.querySelectorAll('#sheetPitchTabs .pitch-tab').forEach(b => {
+    b.className = b.dataset.val === selectedPitchRange 
+      ? 'pitch-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0' 
+      : 'pitch-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0';
+  });
+
+  renderFilterChips();
+}
+
+function renderFilterChips() {
+  const container = document.getElementById('activeFilterChipsContainer');
+  const badge = document.getElementById('activeFilterBadge');
+  if (!container) return;
+
+  const chips = [];
+  if (selectedDecade !== 'all') chips.push({ type: 'decade', label: `${selectedDecade.replace('s', '年代')}` });
+  if (selectedScore !== 'all') chips.push({ type: 'score', label: `状態: ${selectedScore}` });
+  if (selectedAttr !== 'all') {
+    const map = { original: '原曲キー', adjusted: 'キー調整あり', duet: 'デュエット' };
+    chips.push({ type: 'attr', label: map[selectedAttr] || selectedAttr });
+  }
+  if (selectedPitchRange !== 'all') {
+    const map = { low: '低め', normal: '標準', high: '高め', ultra: '超高音' };
+    chips.push({ type: 'pitch', label: `音域: ${map[selectedPitchRange]}` });
+  }
+  selectedTags.forEach(t => chips.push({ type: 'tag', val: t, label: `#${t}` }));
+
+  if (badge) {
+    if (chips.length > 0) {
+      badge.textContent = chips.length;
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
+
+  if (chips.length === 0) {
+    container.innerHTML = '<span class="text-[11px] text-slate-500">全件表示中</span>';
+    return;
+  }
+
+  let html = chips.map(c => `
+    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-950/80 border border-indigo-700/60 text-indigo-200 text-[11px]">
+      ${escapeHtml(c.label)}
+      <button onclick="removeFilterChip('${c.type}', '${escapeHtml(c.val || '')}')" class="hover:text-white text-[10px]">✕</button>
+    </span>
+  `).join('');
+
+  html += `<button onclick="resetAllFiltersInSheet()" class="text-[11px] text-slate-400 hover:text-rose-400 underline ml-1">すべてクリア</button>`;
+  container.innerHTML = html;
+}
+
+window.removeFilterChip = function(type, val) {
+  if (type === 'decade') selectedDecade = 'all';
+  if (type === 'score') selectedScore = 'all';
+  if (type === 'attr') selectedAttr = 'all';
+  if (type === 'pitch') selectedPitchRange = 'all';
+  if (type === 'tag') selectedTags.delete(val);
+  syncFilterControlsVisual();
+  render();
+};
+
+window.setPitchFilter = function(val) {
+  selectedPitchRange = val;
+  syncFilterControlsVisual();
+  render();
+};
+
+// ==========================================
+// モーダル・一括登録ロジック
+// ==========================================
 window.switchModalTab = function(mode) {
   const tabSingle = document.getElementById('modalTabSingle');
   const tabBulk = document.getElementById('modalTabBulk');
@@ -167,9 +319,9 @@ window.switchModalTab = function(mode) {
 
 window.cycleCandidateScore = function(idx) {
   if (!bulkCandidateSongs[idx]) return;
-  const loop = { '練習中': '歌える', '歌える': '得意', '得意': '練習中' };
-  const current = bulkCandidateSongs[idx].score || '練習中';
-  bulkCandidateSongs[idx].score = loop[current] || '練習中';
+  const loop = { 'これから': '練習中', '練習中': '歌える', '歌える': '得意', '得意': 'これから' };
+  const current = bulkCandidateSongs[idx].score || 'これから';
+  bulkCandidateSongs[idx].score = loop[current] || 'これから';
   renderBulkPreview();
 };
 
@@ -231,7 +383,7 @@ window.processBulkSearch = async function() {
           duration: item.trackTimeMillis ? `${mins}:${secs}` : '',
           durationMs: item.trackTimeMillis || 0,
           key: '0',
-          score: '練習中',
+          score: 'これから',
           duetType: isDuet ? 'duet' : 'solo',
           tags: tags,
           isAlreadyAdded: isAlreadyAdded,
@@ -252,7 +404,7 @@ window.processBulkSearch = async function() {
           duration: '',
           durationMs: 0,
           key: '0',
-          score: '練習中',
+          score: 'これから',
           duetType: 'solo',
           tags: [],
           isAlreadyAdded: false,
@@ -289,6 +441,13 @@ function renderBulkPreview() {
     const playId = s.id || `bulk_${idx}`;
     const isPlaying = currentPlayingId === playId;
 
+    const scoreClass = {
+      '得意': 'bg-emerald-950 text-emerald-300 border-emerald-800',
+      '歌える': 'bg-sky-950 text-sky-300 border-sky-800',
+      '練習中': 'bg-amber-950 text-amber-300 border-amber-800',
+      'これから': 'bg-purple-950 text-purple-300 border-purple-800'
+    }[s.score] || 'bg-slate-800 text-slate-300 border-slate-700';
+
     return `
       <div class="p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs space-y-1.5 shadow-sm transition ${s.isAlreadyAdded ? 'opacity-60 bg-slate-950/40 border-dashed' : ''}">
         <div class="flex items-center justify-between text-[10px] text-slate-400 border-b border-slate-900 pb-1">
@@ -305,7 +464,6 @@ function renderBulkPreview() {
         </div>
 
         <div class="flex items-center gap-2.5">
-          <!-- 30秒試聴オーバーレイ付きジャケット -->
           <div onclick="togglePlayPreview('${s.previewUrl || ''}', '${playId}', '${escapeHtml(s.title)}', '${escapeHtml(s.artist)}')" class="relative w-11 h-11 rounded-xl overflow-hidden shrink-0 cursor-pointer shadow border border-slate-800 bg-slate-800">
             ${s.artwork ? `<img src="${s.artwork}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-slate-500 text-xs">🎵</div>`}
             <div class="absolute inset-0 bg-black/40 flex items-center justify-center transition ${isPlaying ? 'opacity-100 bg-rose-950/70' : 'opacity-0 hover:opacity-100'}">
@@ -317,182 +475,25 @@ function renderBulkPreview() {
             <div class="font-bold text-white truncate flex items-center gap-1.5">
               <span>${escapeHtml(s.title)}</span>
               ${s.key !== '0' ? `<span class="text-[9px] bg-slate-800 text-indigo-300 border border-slate-700 px-1 rounded font-mono">${s.key}</span>` : ''}
-              <button type="button" onclick="cycleCandidateScore(${idx})" title="タップで完成度を変更" class="text-[9px] px-1.5 py-0.2 rounded cursor-pointer transition active:scale-95 ${s.score === '得意' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900' : s.score === '歌える' ? 'bg-sky-950 text-sky-300 border border-sky-800 hover:bg-sky-900' : 'bg-amber-950 text-amber-300 border border-amber-800 hover:bg-amber-900'}">
+              <button type="button" onclick="cycleCandidateScore(${idx})" title="タップで完成度を変更" class="text-[9px] px-1.5 py-0.2 rounded cursor-pointer transition active:scale-95 border ${scoreClass}">
                 ${s.score} 🔄
               </button>
               ${s.duetType === 'duet' ? '<span class="text-[9px] bg-purple-950 text-purple-300 border border-purple-800 px-1 rounded whitespace-nowrap">デュエット</span>' : ''}
-              ${s.isAlreadyAdded ? '<span class="text-[9px] bg-slate-800 text-slate-400 border border-slate-700 px-1 rounded whitespace-nowrap">登録済 (スキップ)</span>' : ''}
+              ${s.isAlreadyAdded ? '<span class="text-[9px] bg-slate-800 text-slate-400 border border-slate-700 px-1 rounded whitespace-nowrap">登録済</span>' : ''}
               ${s.notFound ? '<span class="text-[9px] bg-amber-950 text-amber-400 border border-amber-800 px-1 rounded whitespace-nowrap">情報なし</span>' : ''}
             </div>
             <div class="text-[10px] text-slate-400 truncate mt-0.5">
-              ${escapeHtml(s.artist) || '歌手未設定'} ${s.year ? '• ' + s.year + '年' : ''} ${s.genre ? '• ' + escapeHtml(s.genre) : ''} ${s.duration ? '• ' + s.duration : ''}
+              ${escapeHtml(s.artist) || '歌手未設定'} ${s.year ? '• ' + s.year + '年' : ''} ${s.genre ? '• ' + escapeHtml(s.genre) : ''}
             </div>
           </div>
         </div>
-
-        ${s.isEditing ? `
-          <div class="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800 space-y-2 mt-1.5">
-            <div class="grid grid-cols-2 gap-1.5">
-              <div>
-                <label class="block text-[9px] text-slate-400 mb-0.5">曲名</label>
-                <input type="text" id="editTitle_${idx}" value="${escapeHtml(s.title)}" onchange="updateBulkCandidateField(${idx}, 'title', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-white">
-              </div>
-              <div>
-                <label class="block text-[9px] text-slate-400 mb-0.5">歌手名</label>
-                <input type="text" id="editArtist_${idx}" value="${escapeHtml(s.artist)}" onchange="updateBulkCandidateField(${idx}, 'artist', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-white">
-              </div>
-            </div>
-            <div class="grid grid-cols-4 gap-1.5">
-              <div>
-                <label class="block text-[9px] text-slate-400 mb-0.5">キー</label>
-                <select onchange="updateBulkCandidateField(${idx}, 'key', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1 py-1 text-[11px] text-white">
-                  ${['-6','-5','-4','-3','-2','-1','0','+1','+2','+3','+4','+5','+6'].map(k => `<option value="${k}" ${s.key === k ? 'selected' : ''}>${k === '0' ? '原曲' : k}</option>`).join('')}
-                </select>
-              </div>
-              <div>
-                <label class="block text-[9px] text-emerald-400 mb-0.5">完成度</label>
-                <select onchange="updateBulkCandidateField(${idx}, 'score', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1 py-1 text-[11px] text-white">
-                  <option value="得意" ${s.score === '得意' ? 'selected' : ''}>得意</option>
-                  <option value="歌える" ${s.score === '歌える' ? 'selected' : ''}>歌える</option>
-                  <option value="練習中" ${s.score === '練習中' ? 'selected' : ''}>練習中</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-[9px] text-slate-400 mb-0.5">タイプ</label>
-                <select onchange="updateBulkCandidateField(${idx}, 'duetType', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1 py-1 text-[11px] text-white">
-                  <option value="solo" ${s.duetType === 'solo' ? 'selected' : ''}>ソロ</option>
-                  <option value="duet" ${s.duetType === 'duet' ? 'selected' : ''}>デュエット</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-[9px] text-slate-400 mb-0.5">年</label>
-                <input type="text" id="editYear_${idx}" value="${escapeHtml(s.year || '')}" onchange="updateBulkCandidateField(${idx}, 'year', this.value)" placeholder="2020" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-white">
-              </div>
-            </div>
-
-            <div class="pt-1.5 border-t border-slate-800">
-              <div class="text-[9px] text-indigo-400 font-semibold mb-1">🔍 iTunesから再検索して選択差し替え</div>
-              <div class="flex gap-1">
-                <input type="text" id="reSearchInput_${idx}" oninput="updateSearchKeyword(${idx}, this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault(); reSearchSingleBulkCandidate(${idx});}" placeholder="歌手名や曲名を入力..." value="${escapeHtml(s.searchKeyword !== undefined ? s.searchKeyword : ((s.title || '') + ' ' + (s.artist || '')))}" class="flex-1 bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[10px] text-white focus:outline-none focus:border-indigo-500">
-                <button type="button" onclick="reSearchSingleBulkCandidate(${idx})" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded text-[10px] font-semibold whitespace-nowrap">再検索</button>
-              </div>
-
-              <div id="reSearchResults_${idx}" class="mt-1.5 max-h-44 overflow-y-auto no-scrollbar space-y-1 ${s.reSearchResults && s.reSearchResults.length > 0 ? '' : 'hidden'}">
-                ${(s.reSearchResults || []).map(item => {
-                  const raw = encodeURIComponent(JSON.stringify(item));
-                  return `
-                    <div onclick="applyITunesSongToCandidate(${idx}, '${raw}')" class="flex items-center gap-2 p-1.5 bg-slate-950 hover:bg-indigo-950/40 border border-slate-800 hover:border-indigo-600/60 rounded-lg cursor-pointer transition">
-                      ${item.artwork ? `<img src="${item.artwork}" class="w-8 h-8 rounded object-cover shrink-0 bg-slate-800">` : `<div class="w-8 h-8 rounded bg-slate-800 flex items-center justify-center text-[10px] text-slate-500 shrink-0">🎵</div>`}
-                      <div class="min-w-0 flex-1 text-[10px]">
-                        <div class="font-bold text-white truncate flex items-center gap-1">
-                          <span>${escapeHtml(item.title)}</span>
-                          ${item.isDuet ? '<span class="text-[8px] bg-purple-950 text-purple-300 px-1 rounded">デュエット</span>' : ''}
-                        </div>
-                        <div class="text-slate-400 truncate text-[9px]">${escapeHtml(item.artist)} • ${item.year || '年不明'} • ${escapeHtml(item.genre)}</div>
-                      </div>
-                      <span class="text-[9px] text-indigo-400 border border-indigo-700/60 bg-indigo-950/60 px-1.5 py-0.5 rounded font-bold shrink-0">選択</span>
-                    </div>
-                  `;
-                }).join('')}
-              </div>
-            </div>
-          </div>
-        ` : ''}
       </div>
     `;
   }).join('');
 }
 
-window.updateSearchKeyword = function(idx, val) {
-  if (!bulkCandidateSongs[idx]) return;
-  bulkCandidateSongs[idx].searchKeyword = val;
-};
-
 window.toggleEditBulkCandidate = function(idx) {
   bulkCandidateSongs[idx].isEditing = !bulkCandidateSongs[idx].isEditing;
-  if (!bulkCandidateSongs[idx].isEditing) {
-    bulkCandidateSongs[idx].reSearchResults = [];
-  } else if (bulkCandidateSongs[idx].searchKeyword === undefined) {
-    bulkCandidateSongs[idx].searchKeyword = `${bulkCandidateSongs[idx].title || ''} ${bulkCandidateSongs[idx].artist || ''}`.trim();
-  }
-  renderBulkPreview();
-};
-
-window.updateBulkCandidateField = function(idx, field, val) {
-  if (!bulkCandidateSongs[idx]) return;
-  bulkCandidateSongs[idx][field] = val;
-  if (field === 'title' || field === 'artist') {
-    const existingSet = new Set((window.songs || []).map(s => `${(s.title || '').toLowerCase()}_${(s.artist || '').toLowerCase()}`));
-    bulkCandidateSongs[idx].isAlreadyAdded = existingSet.has(`${bulkCandidateSongs[idx].title.toLowerCase()}_${bulkCandidateSongs[idx].artist.toLowerCase()}`);
-    bulkCandidateSongs[idx].notFound = false;
-  }
-};
-
-window.reSearchSingleBulkCandidate = async function(idx) {
-  const inputEl = document.getElementById(`reSearchInput_${idx}`);
-  const term = inputEl ? inputEl.value.trim() : '';
-  if (!term) return alert("検索キーワードを入力してください。");
-
-  bulkCandidateSongs[idx].searchKeyword = term;
-
-  const resultsBox = document.getElementById(`reSearchResults_${idx}`);
-  if (resultsBox) {
-    resultsBox.classList.remove('hidden');
-    resultsBox.innerHTML = '<div class="text-[10px] text-slate-400 py-1.5 text-center">iTunesで候補を検索中...</div>';
-  }
-
-  try {
-    const data = await fetchITunesApi(term, 20);
-    if (!data.results || data.results.length === 0) {
-      if (resultsBox) resultsBox.innerHTML = '<div class="text-[10px] text-slate-500 py-1.5 text-center">曲が見つかりませんでした</div>';
-      return;
-    }
-
-    bulkCandidateSongs[idx].reSearchResults = data.results.map(item => {
-      const year = item.releaseDate ? item.releaseDate.substring(0, 4) : '';
-      const mins = Math.floor((item.trackTimeMillis || 0) / 60000);
-      const secs = Math.floor(((item.trackTimeMillis || 0) % 60000) / 1000).toString().padStart(2, '0');
-      const isDuet = checkIsDuet(item.trackName, item.artistName);
-
-      return {
-        title: item.trackName,
-        artist: item.artistName,
-        year: year,
-        genre: item.primaryGenreName || 'J-Pop',
-        artwork: item.artworkUrl100 || '',
-        previewUrl: item.previewUrl || '',
-        duration: item.trackTimeMillis ? `${mins}:${secs}` : '',
-        durationMs: item.trackTimeMillis || 0,
-        isDuet: isDuet
-      };
-    });
-
-    renderBulkPreview();
-  } catch (e) {
-    if (resultsBox) resultsBox.innerHTML = `<div class="text-[10px] text-rose-400 py-1.5 text-center">検索エラー: ${e.message}</div>`;
-  }
-};
-
-window.applyITunesSongToCandidate = function(idx, encoded) {
-  const item = JSON.parse(decodeURIComponent(encoded));
-  if (!bulkCandidateSongs[idx]) return;
-
-  const existingSet = new Set((window.songs || []).map(s => `${(s.title || '').toLowerCase()}_${(s.artist || '').toLowerCase()}`));
-  const isAlreadyAdded = existingSet.has(`${item.title.toLowerCase()}_${item.artist.toLowerCase()}`);
-
-  bulkCandidateSongs[idx].title = item.title;
-  bulkCandidateSongs[idx].artist = item.artist;
-  bulkCandidateSongs[idx].year = item.year;
-  bulkCandidateSongs[idx].genre = item.genre;
-  bulkCandidateSongs[idx].artwork = item.artwork;
-  bulkCandidateSongs[idx].previewUrl = item.previewUrl;
-  bulkCandidateSongs[idx].duration = item.duration;
-  bulkCandidateSongs[idx].durationMs = item.durationMs;
-  bulkCandidateSongs[idx].duetType = item.isDuet ? 'duet' : 'solo';
-  bulkCandidateSongs[idx].isAlreadyAdded = isAlreadyAdded;
-  bulkCandidateSongs[idx].notFound = false;
-  bulkCandidateSongs[idx].reSearchResults = [];
-
   renderBulkPreview();
 };
 
@@ -536,7 +537,7 @@ window.saveBulkSongs = async function() {
         scoreVal: null,
         duetType: s.duetType || 'solo',
         key: s.key || '0',
-        score: s.score || '練習中',
+        score: s.score || 'これから',
         tags: s.tags || [],
         memo: '',
         singCount: 0,
@@ -557,14 +558,69 @@ window.saveBulkSongs = async function() {
   }
 };
 
+// ==========================================
+// 設定 & AI音域連携
+// ==========================================
 window.openSettingsModal = function() {
   document.getElementById('migrateProgressText').classList.add('hidden');
+  updateUnregisteredPitchCount();
   document.getElementById('settingsModal').classList.remove('hidden');
   lockBodyScroll(true);
 };
 window.closeSettingsModal = function() {
   document.getElementById('settingsModal').classList.add('hidden');
   lockBodyScroll(false);
+};
+
+function updateUnregisteredPitchCount() {
+  const count = (window.songs || []).filter(s => !s.maxPitch || !s.minPitch).length;
+  const badge = document.getElementById('unregisteredPitchCountBadge');
+  if (badge) badge.textContent = `未登録: ${count}曲`;
+}
+
+window.copyAiPitchPrompt = function() {
+  const unregs = (window.songs || []).filter(s => !s.maxPitch || !s.minPitch);
+  if (unregs.length === 0) return alert("すべての曲に音域データが登録されています！");
+
+  const listText = unregs.map(s => `- id: ${s.id} / 曲名: ${s.title} / 歌手: ${s.artist || '不明'}`).join("\n");
+  const prompt = `以下の曲リストについて、カラオケにおける「地声最高音」と「最低音」を調査し、下記のJSON配列形式のみで出力してください。Markdownコードブロック(\`\`\`json)等の注釈は不要です。\n音階は「hiA」「mid2G」「mid1D」等のカラオケ表記を使用してください。不明な場合は空文字にしてください。\n\n[フォーマット例]\n[\n  {"id": "xxx", "maxPitch": "hiA", "minPitch": "mid1C"}\n]\n\n[対象曲リスト]\n${listText}`;
+
+  navigator.clipboard.writeText(prompt).then(() => {
+    alert(`音域未設定の ${unregs.length} 曲分のプロンプトをクリップボードにコピーしました！\nAIに実行させ、結果JSONを下欄に貼り付けてください。`);
+  });
+};
+
+window.applyAiPitchJson = async function() {
+  const input = document.getElementById('aiPitchJsonInput');
+  let raw = input ? input.value.trim() : '';
+  if (!raw) return alert("AIの回答JSONを貼り付けてください。");
+
+  raw = raw.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim();
+
+  try {
+    const list = JSON.parse(raw);
+    if (!Array.isArray(list)) throw new Error("JSON配列形式ではありません");
+    if (!window.firestoreOps) return alert("データベースに接続されていません。");
+
+    const { doc, updateDoc } = window.firestoreOps;
+    let count = 0;
+
+    for (const item of list) {
+      if (item.id && (item.maxPitch || item.minPitch)) {
+        const patch = {};
+        if (item.maxPitch) patch.maxPitch = item.maxPitch;
+        if (item.minPitch) patch.minPitch = item.minPitch;
+        await updateDoc(doc(window.db, "songs", item.id), patch);
+        count++;
+      }
+    }
+
+    alert(`🎉 ${count}件の音域データを反映しました！`);
+    input.value = '';
+    closeSettingsModal();
+  } catch (err) {
+    alert("JSONの解析に失敗しました。正しいフォーマットか確認してください。");
+  }
 };
 
 window.startDataMigration = async function() {
@@ -672,11 +728,15 @@ window.resetAllSingHistory = async function() {
   closeSettingsModal();
 };
 
+// ==========================================
+// メインナビゲーション
+// ==========================================
 window.switchMainTab = function(tab) {
   const tabs = [
     { id: 'mylist', btn: document.getElementById('navTabMyList'), view: document.getElementById('viewMyList') },
     { id: 'recommend', btn: document.getElementById('navTabRecommend'), view: document.getElementById('viewRecommend') },
-    { id: 'ranking', btn: document.getElementById('navTabRanking'), view: document.getElementById('viewRanking') }
+    { id: 'ranking', btn: document.getElementById('navTabRanking'), view: document.getElementById('viewRanking') },
+    { id: 'analysis', btn: document.getElementById('navTabAnalysis'), view: document.getElementById('viewAnalysis') }
   ];
   tabs.forEach(t => {
     if (!t.btn || !t.view) return;
@@ -691,8 +751,12 @@ window.switchMainTab = function(tab) {
 
   if (tab === 'ranking' && rankingSongs.length === 0) loadRanking();
   else if (tab === 'recommend' && recommendedSongs.length === 0) analyzeAndRecommend();
+  else if (tab === 'analysis') renderAnalysis();
 };
 
+// ==========================================
+// プレビュー再生
+// ==========================================
 window.togglePlayPreview = async function(url, id, trackName = '', artistName = '', trackId = '') {
   if (currentPlayingId === id && currentAudio) {
     currentAudio.pause();
@@ -709,9 +773,9 @@ window.togglePlayPreview = async function(url, id, trackName = '', artistName = 
   let playableUrl = url;
   if (!playableUrl && (trackId || (trackName && artistName))) {
     try {
-      const q = trackId ? `https://itunes.apple.com/lookup?id=${trackId}&country=jp` : `${trackName} ${artistName}`;
+      const q = trackId ? `[https://itunes.apple.com/lookup?id=$](https://itunes.apple.com/lookup?id=$){trackId}&country=jp` : `${trackName} ${artistName}`;
       const data = trackId 
-        ? await fetch(`https://itunes.apple.com/lookup?id=${trackId}&country=jp`).then(r => r.json())
+        ? await fetch(`[https://itunes.apple.com/lookup?id=$](https://itunes.apple.com/lookup?id=$){trackId}&country=jp`).then(r => r.json())
         : await fetchITunesApi(q, 1);
       if (data.results && data.results.length > 0 && data.results[0].previewUrl) {
         playableUrl = data.results[0].previewUrl;
@@ -740,11 +804,14 @@ function renderAllViews() {
   }
 }
 
+// ==========================================
+// 流行チャート (Apple Music)
+// ==========================================
 window.loadRanking = async function() {
   const container = document.getElementById('rankingList');
   container.innerHTML = '<div class="text-center text-slate-500 py-12 text-sm">ランキングを取得中...</div>';
   try {
-    const res = await fetch('https://itunes.apple.com/jp/rss/topsongs/limit=50/json');
+    const res = await fetch('[https://itunes.apple.com/jp/rss/topsongs/limit=50/json](https://itunes.apple.com/jp/rss/topsongs/limit=50/json)');
     const data = await res.json();
     rankingSongs = (data.feed.entry || []).map((entry, idx) => {
       let previewUrl = '';
@@ -803,6 +870,9 @@ function renderRanking() {
   }).join('');
 }
 
+// ==========================================
+// 名曲発掘 (動的ローテーション & シャッフル取得)
+// ==========================================
 window.analyzeAndRecommend = async function() {
   const insightEl = document.getElementById('recommendInsight');
   const listEl = document.getElementById('recommendList');
@@ -813,7 +883,7 @@ window.analyzeAndRecommend = async function() {
     return;
   }
 
-  insightEl.innerHTML = 'マイリストの歌手・年代プロファイルを解析中...';
+  insightEl.innerHTML = 'マイリストの歌手・年代プロファイルを動的解析中...';
   listEl.innerHTML = '<div class="text-center text-slate-500 py-12 text-sm">昔の名曲・数珠つなぎ候補を発掘中...</div>';
 
   const artistCounts = {};
@@ -835,32 +905,44 @@ window.analyzeAndRecommend = async function() {
     }
   });
 
-  const topArtists = Object.keys(artistCounts).sort((a, b) => artistCounts[b] - artistCounts[a]).slice(0, 3);
-  const topDecade = Object.keys(decadeCounts).reduce((a, b) => decadeCounts[a] > decadeCounts[b] ? a : b);
-  const decadeLabel = { '1970s': '1970年代以前', '1980s': '1980年代', '1990s': '1990年代', '2000s': '2000年代', '2010s': '2010年代', '2020s': '2020年代' }[topDecade];
+  const sortedArtists = Object.keys(artistCounts).sort((a, b) => artistCounts[b] - artistCounts[a]);
+  if (sortedArtists.length === 0) return;
+
+  // 動的化: 上位5名からランダム2名 + 下位から隠れ枠1名
+  const topPool = sortedArtists.slice(0, 5);
+  const pickedArtists = [...topPool].sort(() => 0.5 - Math.random()).slice(0, 2);
+  const hiddenPool = sortedArtists.slice(5);
+  const pickedHidden = hiddenPool.length > 0 ? hiddenPool[Math.floor(Math.random() * hiddenPool.length)] : null;
+
+  const activeDecades = Object.keys(decadeCounts).filter(k => decadeCounts[k] > 0);
+  const pickedDecadeKey = activeDecades.length > 0 ? activeDecades[Math.floor(Math.random() * activeDecades.length)] : '2010s';
+  const decadeLabel = { '1970s': '1970年代以前', '1980s': '1980年代', '1990s': '1990年代', '2000s': '2000年代', '2010s': '2010年代', '2020s': '2020年代' }[pickedDecadeKey];
 
   let relatedArtists = [];
-  topArtists.forEach(a => {
+  pickedArtists.forEach(a => {
     const l = a.toLowerCase();
     Object.keys(ARTIST_RELATIONS).forEach(k => {
       if (l.includes(k) || k.includes(l)) relatedArtists.push(...ARTIST_RELATIONS[k]);
     });
   });
-  relatedArtists = Array.from(new Set(relatedArtists)).slice(0, 3);
+  relatedArtists = Array.from(new Set(relatedArtists)).sort(() => 0.5 - Math.random()).slice(0, 3);
 
   insightEl.innerHTML = `
     <div class="font-bold text-indigo-300">💡 カラオケプロファイル</div>
-    <div>よく歌う歌手: <strong class="text-white">${topArtists.join(', ') || '未設定'}</strong></div>
+    <div>注目歌手: <strong class="text-white">${pickedArtists.join(', ')}</strong> ${pickedHidden ? `<span class="text-indigo-400 text-[10px]">(隠れ枠: ${pickedHidden})</span>` : ''}</div>
     ${relatedArtists.length ? `<div>数珠つなぎ連想: <strong class="text-emerald-300">${relatedArtists.join(', ')}</strong></div>` : ''}
-    <div>中心年代: <strong class="text-white">${decadeLabel}</strong></div>
+    <div>注目年代: <strong class="text-white">${decadeLabel}</strong></div>
   `;
 
   const fetchedCandidates = [];
-  const myTitles = new Set(window.songs.map(s => (s.title || '').toLowerCase().replace(/\s+/g, '')));
+  const myTitles = new Set((window.songs || []).map(s => (s.title || '').toLowerCase().replace(/\s+/g, '')));
 
-  for (const artist of topArtists.slice(0, 2)) {
+  const searchPool = [...pickedArtists];
+  if (pickedHidden) searchPool.push(pickedHidden);
+
+  for (const artist of searchPool) {
     try {
-      const data = await fetchITunesApi(artist, 10);
+      const data = await fetchITunesApi(artist, 20);
       (data.results || []).forEach(item => {
         if (!myTitles.has((item.trackName || '').toLowerCase().replace(/\s+/g, ''))) {
           fetchedCandidates.push({
@@ -871,7 +953,7 @@ window.analyzeAndRecommend = async function() {
             artwork: item.artworkUrl100 || '',
             previewUrl: item.previewUrl || '',
             durationMs: item.trackTimeMillis || 0,
-            reason: `🎤 「${artist}」の未登録人気曲`
+            reason: `🎤 「${artist}」の未登録曲`
           });
         }
       });
@@ -880,7 +962,7 @@ window.analyzeAndRecommend = async function() {
 
   for (const rArtist of relatedArtists.slice(0, 2)) {
     try {
-      const data = await fetchITunesApi(rArtist, 5);
+      const data = await fetchITunesApi(rArtist, 10);
       (data.results || []).forEach(item => {
         if (!myTitles.has((item.trackName || '').toLowerCase().replace(/\s+/g, ''))) {
           fetchedCandidates.push({
@@ -956,15 +1038,16 @@ window.addFromRanking = function(encoded) {
   document.getElementById('formArtwork').value = data.artwork || '';
   document.getElementById('formPreviewUrl').value = data.previewUrl || '';
   document.getElementById('formDuetType').value = checkIsDuet(data.title, data.artist) ? 'duet' : 'solo';
+  document.getElementById('formScore').value = 'これから';
 
   const tags = [];
   const decTag = getDecadeTag(data.year);
   if (decTag) tags.push(decTag);
-  tags.push('名曲発掘');
+  // 名曲発掘タグの付与を撤廃
   document.getElementById('formTags').value = tags.join(', ');
 };
 
-// ディスコグラフィ機能
+// ディスコグラフィ機能 (完全維持)
 window.openArtistDiscography = async function(artistName) {
   if (!artistName) return;
   const modal = document.getElementById('artistModal');
@@ -1055,7 +1138,7 @@ window.renderArtistDiscography = function() {
             <span>${escapeHtml(item.title)}</span>
             ${item.isDuet ? '<span class="text-[8px] bg-purple-950 text-purple-300 px-1 rounded whitespace-nowrap">デュエット</span>' : ''}
           </div>
-          <div class="text-[10px] text-slate-400 truncate mt-0.5">${item.year ? item.year + '年 • ' : ''}${escapeHtml(item.genre)} ${item.duration ? '• ' + item.duration : ''}</div>
+          <div class="text-[10px] text-slate-400 truncate mt-0.5">${item.year ? item.year + '年 • ' : ''}${escapeHtml(item.genre)}</div>
         </div>
 
         <div class="shrink-0">
@@ -1083,6 +1166,7 @@ window.addFromDiscography = function(encoded) {
   document.getElementById('formDuration').value = item.duration;
   document.getElementById('formDurationMs').value = item.durationMs;
   document.getElementById('formDuetType').value = item.isDuet ? 'duet' : 'solo';
+  document.getElementById('formScore').value = 'これから';
 
   const tags = [];
   const decTag = getDecadeTag(item.year);
@@ -1121,9 +1205,6 @@ window.searchITunes = async function() {
       const tags = [];
       const decTag = getDecadeTag(year);
       if (decTag) tags.push(decTag);
-
-      if (item.trackTimeMillis && item.trackTimeMillis < 190000) tags.push('短め');
-      else if (item.trackTimeMillis && item.trackTimeMillis > 300000) tags.push('長尺');
 
       return {
         title: item.trackName,
@@ -1169,7 +1250,6 @@ window.renderITunesResults = function() {
             ${item.isDuet ? '<span class="text-[9px] bg-purple-950 text-purple-300 border border-purple-800 px-1 rounded whitespace-nowrap">👥 デュエット</span>' : ''}
           </div>
           <div class="text-[10px] text-slate-500 truncate">${escapeHtml(item.artist)} • ${item.year || '年不明'} • ${escapeHtml(item.genre)}</div>
-          <div class="text-[9px] text-indigo-400 mt-0.5 truncate">自動タグ: #${item.tags.join(' #')}</div>
         </div>
       </div>
     `;
@@ -1192,7 +1272,9 @@ window.selectITunesSong = function(encoded) {
   document.getElementById('apiSortRow').classList.add('hidden');
 };
 
-// ピックアップ機能
+// ==========================================
+// ピックアップ機能 (完全維持)
+// ==========================================
 window.toggleSetlistDrawer = function() {
   document.getElementById('setlistDrawer').classList.toggle('translate-y-full');
 };
@@ -1235,7 +1317,7 @@ window.copySetlistToClipboard = async function() {
   const totalSecs = Math.floor((totalMs % 60000) / 1000).toString().padStart(2, '0');
   lines.push("------------------------");
   lines.push(`計 ${setlist.length}曲（合計 約${totalMins}分${totalSecs}秒）`);
-  lines.push("#マイカラオケリスト");
+  lines.push("#OHAKO");
 
   const text = lines.join("\n");
   const btn = document.getElementById('btnCopySetlist');
@@ -1299,7 +1381,7 @@ window.renderSetlist = function() {
           <span class="font-mono font-bold text-indigo-400 w-4 text-center shrink-0">${idx + 1}</span>
           <div class="min-w-0">
             <div class="font-bold text-white truncate">${escapeHtml(s.title)}</div>
-            <div class="text-[10px] text-slate-400 truncate">${escapeHtml(s.artist)} • ${s.key === '0' ? '原曲' : 'キー ' + s.key} ${s.duration ? '(' + s.duration + ')' : ''}</div>
+            <div class="text-[10px] text-slate-400 truncate">${escapeHtml(s.artist)} • ${s.key === '0' ? '原曲' : 'キー ' + s.key}</div>
           </div>
         </div>
         <div class="flex items-center gap-1 shrink-0">
@@ -1353,8 +1435,6 @@ function getCurrentFilteredSongs() {
                          (s.year ? s.year.toString().includes(queryStr) : false) ||
                          (s.tags && s.tags.some(t => t.toLowerCase().includes(queryStr)));
     
-    const matchesGenre = selectedGenre ? s.genre === selectedGenre : true;
-    
     let matchesTag = true;
     if (selectedTags.size > 0) {
       const songTags = s.tags || [];
@@ -1375,15 +1455,19 @@ function getCurrentFilteredSongs() {
     else if (selectedDecade === '1970s') matchesDecade = yr < 1980;
 
     let matchesAttr = true;
-    if (selectedAttr === 'original') matchesAttr = s.key === '0';
-    else if (selectedAttr === 'plus') matchesAttr = (s.key || '').startsWith('+');
-    else if (selectedAttr === 'minus') matchesAttr = (s.key || '').startsWith('-');
+    if (selectedAttr === 'original') matchesAttr = (s.key === '0' || s.key === '原曲' || !s.key);
+    else if (selectedAttr === 'adjusted') matchesAttr = (s.key !== '0' && s.key !== '原曲' && s.key);
     else if (selectedAttr === 'duet') matchesAttr = s.duetType === 'duet';
 
-    return matchesQuery && matchesGenre && matchesTag && matchesScore && matchesDecade && matchesAttr;
+    const matchesPitch = matchPitchRange(s.maxPitch, selectedPitchRange);
+
+    return matchesQuery && matchesTag && matchesScore && matchesDecade && matchesAttr && matchesPitch;
   });
 }
 
+// ==========================================
+// マイリスト描画 (ジャケット再生統一 & タグ色修正)
+// ==========================================
 window.render = function() {
   const sortSelect = document.getElementById('sortSelect');
   const sortMode = sortSelect ? sortSelect.value : 'lastSung';
@@ -1398,18 +1482,7 @@ window.render = function() {
     return (b.createdAt || 0) - (a.createdAt || 0);
   });
 
-  const allGenres = Array.from(new Set((window.songs || []).map(s => s.genre).filter(Boolean)));
-  const genreContainer = document.getElementById('genreFilterList');
-  if (genreContainer) {
-    genreContainer.innerHTML = '';
-    if (allGenres.length > 0) {
-      genreContainer.innerHTML += `<button onclick="setFilterGenre(null)" class="px-2.5 py-1 rounded-lg whitespace-nowrap shrink-0 transition ${selectedGenre === null ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">全ジャンル</button>`;
-      allGenres.forEach(g => {
-        genreContainer.innerHTML += `<button onclick="setFilterGenre('${g}')" class="px-2.5 py-1 rounded-lg whitespace-nowrap shrink-0 transition ${selectedGenre === g ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-900 text-slate-400 border border-slate-800'}">${escapeHtml(g)}</button>`;
-      });
-    }
-  }
-
+  // タグリストの描画（色戻りバグ修復）
   const allTags = Array.from(new Set((window.songs || []).flatMap(s => s.tags || [])));
   const tagContainer = document.getElementById('tagFilterList');
   const tagBadge = document.getElementById('selectedTagBadge');
@@ -1430,7 +1503,7 @@ window.render = function() {
         const isSelected = selectedTags.has(tag);
         tagContainer.innerHTML += `
           <button onclick="toggleTagFilter('${escapeHtml(tag)}')" class="px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 transition text-[11px] flex items-center gap-1 ${
-            isSelected ? 'bg-indigo-600 text-white font-bold shadow-sm' : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-white'
+            isSelected ? 'bg-indigo-600 text-white font-bold shadow-sm' : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white'
           }">
             <span>#${escapeHtml(tag)}</span>
             ${isSelected ? '<span class="text-[9px]">✓</span>' : ''}
@@ -1439,6 +1512,8 @@ window.render = function() {
       });
     }
   }
+
+  renderFilterChips();
 
   const songCountEl = document.getElementById('songCount');
   if (songCountEl) {
@@ -1455,21 +1530,31 @@ window.render = function() {
 
   listContainer.innerHTML = filtered.map(s => {
     const isPlaying = currentPlayingId === s.id;
-    const lyricsSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(s.title + ' ' + (s.artist || '') + ' 歌詞')}`;
+    const lyricsSearchUrl = `[https://www.google.com/search?q=$](https://www.google.com/search?q=$){encodeURIComponent(s.title + ' ' + (s.artist || '') + ' 歌詞')}`;
     const hasUndo = undoHistory[s.id] !== undefined;
     const inSetlist = setlist.includes(s.id);
     const isExpanded = expandedCardIds.has(s.id);
     const pUrl = s.previewUrl || '';
 
+    const scoreClass = {
+      '得意': 'bg-emerald-950 text-emerald-400 border-emerald-800/80',
+      '歌える': 'bg-sky-950 text-sky-400 border-sky-800/80',
+      '練習中': 'bg-amber-950 text-amber-400 border-amber-800/80',
+      'これから': 'bg-purple-950 text-purple-400 border-purple-800/80'
+    }[s.score] || 'bg-slate-800 text-slate-400 border-slate-700';
+
     return `
       <div class="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-sm transition overflow-hidden">
         <div class="p-3 flex items-center gap-2.5">
-          ${s.artwork ? `
-            <img src="${s.artwork}" onclick="toggleExpandCard('${s.id}')" class="w-12 h-12 rounded-xl object-cover shrink-0 bg-slate-800 shadow border border-slate-800/80 cursor-pointer">
-          ` : `
-            <div onclick="toggleExpandCard('${s.id}')" class="w-12 h-12 rounded-xl bg-slate-800 border border-slate-800/80 flex items-center justify-center shrink-0 text-lg text-slate-600 cursor-pointer">🎵</div>
-          `}
+          <!-- ジャケットタップで試聴再生に統一 -->
+          <div onclick="togglePlayPreview('${pUrl}', '${s.id}', '${escapeHtml(s.title)}', '${escapeHtml(s.artist)}')" class="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 cursor-pointer shadow border border-slate-800 bg-slate-800">
+            ${s.artwork ? `<img src="${s.artwork}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-lg text-slate-600">🎵</div>`}
+            <div class="absolute inset-0 bg-black/40 flex items-center justify-center transition ${isPlaying ? 'opacity-100 bg-rose-950/70' : 'opacity-0 hover:opacity-100'}">
+              <span class="text-xs text-white">${isPlaying ? '⏹' : '▶'}</span>
+            </div>
+          </div>
 
+          <!-- 曲名タップで詳細開閉 -->
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-1.5 cursor-pointer" onclick="toggleExpandCard('${s.id}')">
               <div class="font-bold text-sm text-white truncate">${escapeHtml(s.title)}</div>
@@ -1485,11 +1570,7 @@ window.render = function() {
             </div>
 
             <div class="flex items-center gap-1 flex-wrap mt-1 text-[9px]">
-              <span class="px-1 py-0.2 rounded font-medium whitespace-nowrap ${
-                s.score === '得意' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/80' :
-                s.score === '歌える' ? 'bg-sky-950 text-sky-400 border border-sky-800/80' :
-                'bg-amber-950 text-amber-400 border border-amber-800/80'
-              }">${s.score}</span>
+              <span class="px-1 py-0.2 rounded font-medium whitespace-nowrap border ${scoreClass}">${s.score || 'これから'}</span>
               ${s.scoreVal ? `<span class="bg-amber-950/80 text-amber-300 px-1 py-0.2 rounded border border-amber-700/80 font-mono font-bold">🎯 ${s.scoreVal}点</span>` : ''}
               ${s.singCount ? `<span class="bg-indigo-950/70 text-indigo-300 px-1 py-0.2 rounded border border-indigo-800/70 font-mono">🔥 ${s.singCount}回</span>` : ''}
               ${s.duetType === 'duet' ? '<span class="bg-purple-950 text-purple-300 border border-purple-800">👥 デュエット</span>' : ''}
@@ -1550,7 +1631,7 @@ window.render = function() {
                 <a href="${lyricsSearchUrl}" target="_blank" rel="noopener" class="text-slate-400 hover:text-sky-400 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700 flex items-center gap-1 whitespace-nowrap">
                   📄 歌詞
                 </a>
-                <a href="https://www.youtube.com/results?search_query=${encodeURIComponent((s.artist ? s.artist + ' ' : '') + s.title)}" target="_blank" rel="noopener" class="text-slate-400 hover:text-red-400 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700 flex items-center gap-1 whitespace-nowrap">
+                <a href="[https://www.youtube.com/results?search_query=$](https://www.youtube.com/results?search_query=$){encodeURIComponent((s.artist ? s.artist + ' ' : '') + s.title)}" target="_blank" rel="noopener" class="text-slate-400 hover:text-red-400 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700 flex items-center gap-1 whitespace-nowrap">
                   ▶️ YT
                 </a>
                 <button onclick="deleteSong('${s.id}')" class="text-slate-500 hover:text-rose-400 bg-slate-800 border border-slate-700 p-1 rounded-lg text-xs" title="削除">🗑️</button>
@@ -1575,35 +1656,117 @@ window.setTagFilterMode = function(mode) {
   document.getElementById('tagModeOr').className = mode === 'OR' ? "px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-600 text-white" : "px-1.5 py-0.5 rounded text-[9px] text-slate-400 hover:text-white";
   render();
 };
+
 window.setScoreFilter = function(score) {
   selectedScore = score;
-  document.querySelectorAll('.score-tab').forEach(b => {
-    b.className = b.dataset.val === score 
-      ? 'score-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0' 
-      : 'score-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0';
-  });
+  syncFilterControlsVisual();
   render();
 };
 window.setDecadeFilter = function(decade) {
   selectedDecade = decade;
-  document.querySelectorAll('.decade-tab').forEach(b => {
-    b.className = b.dataset.val === decade 
-      ? 'decade-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0' 
-      : 'decade-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0';
-  });
+  syncFilterControlsVisual();
   render();
 };
 window.setAttrFilter = function(attr) {
   selectedAttr = attr;
-  document.querySelectorAll('.attr-tab').forEach(b => {
-    b.className = b.dataset.val === attr 
-      ? 'attr-tab px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium whitespace-nowrap shrink-0' 
-      : 'attr-tab px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0';
-  });
+  syncFilterControlsVisual();
   render();
 };
-window.setFilterGenre = function(g) { selectedGenre = g; render(); };
 
+// ==========================================
+// マイ分析ダッシュボード
+// ==========================================
+function renderAnalysis() {
+  const activeSongs = (window.songs || []).filter(s => s.score && s.score !== 'これから');
+  
+  document.getElementById('statActiveCount').textContent = `${activeSongs.length}曲`;
+
+  const scored = activeSongs.filter(s => typeof s.scoreVal === 'number' && s.scoreVal > 0);
+  const avg = scored.length > 0 ? (scored.reduce((acc, s) => acc + s.scoreVal, 0) / scored.length).toFixed(1) : '--';
+  document.getElementById('statAvgScore').textContent = avg !== '--' ? `${avg}点` : '--';
+
+  const over90 = scored.filter(s => s.scoreVal >= 90).length;
+  document.getElementById('statOver90Count').textContent = `${over90}曲`;
+
+  const totalSing = activeSongs.reduce((acc, s) => acc + (s.singCount || 0), 0);
+  document.getElementById('statTotalSingCount').textContent = `${totalSing}回`;
+
+  // ボイスレンジ
+  const pitchRanks = activeSongs.map(s => getPitchRank(s.maxPitch)).filter(r => r > 0);
+  const voiceRangeEl = document.getElementById('analysisVoiceRange');
+  if (pitchRanks.length > 0) {
+    const minR = Math.min(...pitchRanks);
+    const maxR = Math.max(...pitchRanks);
+    const findKey = (r) => Object.keys(PITCH_RANK).find(k => PITCH_RANK[k] === r) || "";
+    voiceRangeEl.innerHTML = `
+      <div class="flex items-center justify-between">
+        <span class="text-slate-400">主力最高音レンジ:</span>
+        <strong class="text-amber-400 font-bold">${findKey(minR)} 〜 ${findKey(maxR)}</strong>
+      </div>
+      <p class="text-[10px] text-slate-500 mt-0.5">※「これから」以外の登録曲の実績から算出</p>
+    `;
+  } else {
+    voiceRangeEl.innerHTML = '<span class="text-slate-500">音域データがまだありません（⚙️設定からAI一括取得が可能です）</span>';
+  }
+
+  // キー別平均スコア
+  const keyMap = {};
+  scored.forEach(s => {
+    const k = (s.key === '0' || !s.key) ? '原曲' : s.key;
+    if (!keyMap[k]) keyMap[k] = { sum: 0, count: 0 };
+    keyMap[k].sum += s.scoreVal;
+    keyMap[k].count++;
+  });
+
+  const keyContainer = document.getElementById('analysisKeyScores');
+  const keyKeys = Object.keys(keyMap);
+  if (keyKeys.length === 0) {
+    keyContainer.innerHTML = '<span class="text-slate-500">スコアデータがありません</span>';
+  } else {
+    keyContainer.innerHTML = keyKeys.map(k => {
+      const item = keyMap[k];
+      const mean = (item.sum / item.count).toFixed(1);
+      return `
+        <div class="flex items-center justify-between py-0.5 border-b border-slate-800">
+          <span class="text-slate-300">キー [ ${escapeHtml(k)} ]</span>
+          <span class="font-bold text-indigo-300">${mean}点 <span class="text-[10px] text-slate-500">(${item.count}曲)</span></span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // ご無沙汰曲 (得意なのに3ヶ月以上未歌唱)
+  const threeMonthsAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
+  const dormant = activeSongs.filter(s => {
+    if (s.score !== '得意') return false;
+    if (!s.lastSungAt) return true;
+    return s.lastSungAt < threeMonthsAgo;
+  }).slice(0, 5);
+
+  const dormantEl = document.getElementById('analysisDormantSongs');
+  if (dormant.length === 0) {
+    dormantEl.innerHTML = '<span class="text-slate-500">直近しっかり歌われています！</span>';
+  } else {
+    dormantEl.innerHTML = dormant.map(s => `
+      <div class="flex items-center justify-between py-0.5">
+        <span class="truncate text-slate-300">${escapeHtml(s.title)}</span>
+        <span class="text-[10px] text-amber-500 shrink-0">ご無沙汰</span>
+      </div>
+    `).join('');
+  }
+
+  // 最多歌唱Top 5
+  const mostSung = [...activeSongs].sort((a, b) => (b.singCount || 0) - (a.singCount || 0)).slice(0, 5);
+  const mostSungEl = document.getElementById('analysisMostSung');
+  mostSungEl.innerHTML = mostSung.map((s, idx) => `
+    <div class="flex items-center justify-between py-0.5">
+      <span class="truncate text-slate-300">${idx + 1}. ${escapeHtml(s.title)}</span>
+      <span class="text-[11px] font-bold text-indigo-300 shrink-0">${s.singCount || 0}回</span>
+    </div>
+  `).join('');
+}
+
+// 歌唱記録
 window.recordSung = async function(id) {
   if (!window.firestoreOps) return;
   const target = (window.songs || []).find(s => s.id === id);
@@ -1648,7 +1811,7 @@ function resetModalInputs() {
   document.getElementById('formSingCount').value = '0';
   document.getElementById('formDuetType').value = 'solo';
   document.getElementById('formKey').value = '0';
-  document.getElementById('formScore').value = '練習中';
+  document.getElementById('formScore').value = 'これから';
   
   document.getElementById('apiSearchResults').innerHTML = '';
   document.getElementById('apiSearchResults').classList.add('hidden');
@@ -1697,7 +1860,7 @@ window.openEditModal = function(id) {
   document.getElementById('formScoreVal').value = s.scoreVal || '';
   document.getElementById('formDuetType').value = s.duetType || 'solo';
   document.getElementById('formKey').value = s.key || '0';
-  document.getElementById('formScore').value = s.score || '練習中';
+  document.getElementById('formScore').value = s.score || 'これから';
   document.getElementById('formTags').value = (s.tags || []).join(', ');
   document.getElementById('formMemo').value = s.memo || '';
   
