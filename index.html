@@ -64,6 +64,15 @@
       </div>
     </div>
 
+    <!-- 小鳥マスコット居場所インジケーター -->
+    <div class="max-w-md mx-auto flex items-center justify-between px-1 text-[11px] text-slate-400">
+      <div class="flex items-center gap-1.5 cursor-pointer hover:text-indigo-300 transition" onclick="showMascotStatusModal()" title="相棒の居場所を確認">
+        <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" id="mascotStatusDot"></span>
+        <span id="mascotHeaderStatusText">🐦 相棒がアプリ内を散歩中...</span>
+      </div>
+      <span class="text-[10px] text-slate-500" id="mascotTimerText">移動まであと --秒</span>
+    </div>
+
     <!-- 4分割メインナビゲーション -->
     <div class="max-w-md mx-auto grid grid-cols-4 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
       <button id="navTabMyList" onclick="switchMainTab('mylist')" class="py-1.5 rounded-lg font-bold transition bg-indigo-600 text-white shadow text-center truncate">
@@ -1121,6 +1130,50 @@
       <button type="button" onclick="closeArtistModal()" class="w-full bg-slate-800 text-slate-300 py-2 rounded-lg text-xs font-bold shrink-0">
         閉じる
       </button>
+    </div>
+  </div>
+
+
+  <!-- ==================== 🏠 アプリ内生活・自律移動型マスコットウィジェット ==================== -->
+  <div id="livingMascotWidget" class="fixed bottom-6 right-4 z-50 hidden items-end gap-2 max-w-[220px] transition-all duration-300 transform translate-y-2 opacity-0 pointer-events-auto">
+    <!-- 吹き出し -->
+    <div class="bg-slate-900/95 border border-indigo-500/60 rounded-2xl p-2.5 shadow-2xl backdrop-blur text-xs space-y-1 relative max-w-[150px]">
+      <div class="flex items-center justify-between text-[9px] text-indigo-400 font-bold">
+        <span id="mascotRoomBadge">マイリスト</span>
+        <button onclick="toggleMascotSpeech()" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+      <div id="livingMascotBubble" class="text-[11px] text-slate-100 font-medium leading-snug">
+        「ここで何歌うか考え中…」
+      </div>
+    </div>
+    <!-- 小鳥キャラクター本体 (極小フロート) -->
+    <div onclick="tapLivingMascot()" class="relative w-12 h-12 rounded-2xl overflow-hidden shrink-0 border-2 border-indigo-500/80 bg-slate-950 shadow-lg shadow-indigo-500/30 cursor-pointer active:scale-95 transition hover:scale-105">
+      <img id="livingMascotImage" src="assets/mascot_normal.jpg" alt="OHAKO Mascot" class="w-full h-full object-cover" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'><rect width='48' height='48' fill='%2316161a'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-size='10px'>(・Θ・)</text></svg>'">
+    </div>
+  </div>
+
+  <!-- 相棒ステータス確認モーダル -->
+  <div id="mascotStatusModal" class="fixed inset-0 z-[80] bg-black/80 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-5 shadow-2xl space-y-4 text-xs">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-2.5">
+        <h3 class="font-bold text-sm text-white flex items-center gap-1.5">
+          <span>🐦</span>
+          <span>音楽オタクの小鳥の居場所</span>
+        </h3>
+        <button onclick="closeMascotStatusModal()" class="text-slate-400 hover:text-white text-sm p-1">✕</button>
+      </div>
+      <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2 text-slate-300">
+        <div id="mascotModalDetailText" class="font-medium">現在、マイリストの部屋でくつろいでいます。</div>
+        <div class="text-[10px] text-slate-400">※アプリ内の各タブ（マイリスト・名曲発掘・流行曲・マイ分析）をトコトコと自律的に移動して生活しています。</div>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="summonMascotToCurrentTab()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-xl font-bold transition">
+          🧲 今いるタブに呼ぶ
+        </button>
+        <button onclick="closeMascotStatusModal()" class="px-4 bg-slate-800 text-slate-300 py-2 rounded-xl font-bold">
+          閉じる
+        </button>
+      </div>
     </div>
   </div>
 
