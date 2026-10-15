@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OHAKO - Music Otaku Bird Mascot Component</title>
+    <style>
+        :root {
+            --bg-color: #121216;
+            --card-bg: #1e1e24;
+            --accent-color: #4f46e5;
+            --accent-hover: #6366f1;
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --border-color: #2d2d38;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 2rem 1rem;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        header p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .mascot-display-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .speech-bubble {
+            background: #2a2a36;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 0.8rem 1.2rem;
+            font-size: 1rem;
+            font-weight: 500;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: 400px;
+            position: relative;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 8px 8px 0;
+            border-style: solid;
+            border-color: #2a2a36 transparent;
+            display: block;
+            width: 0;
+        }
+
+        .mascot-image-wrapper {
+            width: 100%;
+            max-width: 450px;
+            aspect-ratio: 1 / 1;
+            background: #16161a;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        .mascot-image-wrapper img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            transition: opacity 0.2s ease-in-out;
+        }
+
+        .controls-section {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+        }
+
+        .controls-section h2 {
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .state-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .state-btn {
+            background-color: #262630;
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .state-btn:hover {
+            background-color: #323240;
+            border-color: var(--accent-color);
+            transform: translateY(-1px);
+        }
+
+        .state-btn.active {
+            background-color: var(--accent-color);
+            border-color: var(--accent-hover);
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
+        }
+
+        .integration-info {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .integration-info h3 {
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+
+        .integration-info code {
+            background: #16161a;
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #a5b4fc;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>OHAKO Mascot Component</h1>
+        <p>音楽オタクの小鳥マスコット・ステート管理プレビュー</p>
+    </header>
+
+    <div class="container">
+        <!-- Display Card -->
+        <div class="mascot-display-card">
+            <div class="speech-bubble" id="speechBubble">「聴いてやってる」</div>
+            <div class="mascot-image-wrapper">
+                <img id="mascotImage" src="assets/mascot_normal.jpg" alt="OHAKO Mascot" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'300\' viewBox=\'0 0 300 300\'><rect width=\'300\' height=\'300\' fill=\'%231a1a24\'/><text x=\'50%\' y=\'50%\' dominant-baseline=\'middle\' text-anchor=\'middle\' fill=\'%239ca3af\' font-family=\'sans-serif\' font-size=\'16px\'><![CDATA[Image Not Found]]></text></svg>'">
+            </div>
+        </div>
+
+        <!-- Controls / State Switcher -->
+        <div class="controls-section">
+            <h2>ステート切替コントロール</h2>
+            <div class="state-buttons">
+                <button class="state-btn active" data-state="normal" data-text="「聴いてやってる」">通常</button>
+                <button class="state-btn" data-state="happy" data-text="「すごい！今の完璧だろ！」">ご機嫌</button>
+                <button class="state-btn" data-state="bored" data-text="「はぁ…また音外したな」">呆れ</button>
+                <button class="state-btn" data-state="confused" data-text="「えっ？どういうこと？」">困惑</button>
+                <button class="state-btn" data-state="focused" data-text="「よし、ここを詳しく分析しよう…」">集中</button>
+                <button class="state-btn" data-state="relaxed" data-text="「ふう…一旦休憩だな」">脱力</button>
+                <button class="state-btn" data-state="playback" data-text="「ふむ…よく聴いてみよう」">再生</button>
+                <button class="state-btn" data-state="recording" data-text="「よし、次は君の番だ。やってみろ」">録音</button>
+                <button class="state-btn" data-state="error" data-text="「えっ!? どうして繋がらないんだ!?」">エラー</button>
+            </div>
+        </div>
+
+        <!-- Integration Guide -->
+        <div class="integration-info">
+            <h3>組み込み方法</h3>
+            <p>このコンポーネントは既存のファイルに干渉しない独立した構成になっています。アプリ本体から状態を変更するには <code>window.setMascotState('happy')</code> のように関数を呼び出すだけで自動的に吹き出しと画像が連動します。</p>
+        </div>
+    </div>
+
+    <script>
+        // Mascot State Manager (JPEG versions)
+        const states = {
+            normal: { text: "「聴いてやってる」", image: "assets/mascot_normal.jpg" },
+            happy: { text: "「すごい！今の完璧だろ！」", image: "assets/mascot_happy.jpg" },
+            bored: { text: "「はぁ…また音外したな」", image: "assets/mascot_bored.jpg" },
+            confused: { text: "「えっ？どういうこと？」", image: "assets/mascot_confused.jpg" },
+            focused: { text: "「よし、ここを詳しく分析しよう…」", image: "assets/mascot_focused.jpg" },
+            relaxed: { text: "「ふう…一旦休憩だな」", image: "assets/mascot_relaxed.jpg" },
+            playback: { text: "「ふむ…よく聴いてみよう」", image: "assets/mascot_playback.jpg" },
+            recording: { text: "「よし、次は君の番だ。やってみろ」", image: "assets/mascot_recording.jpg" },
+            error: { text: "「えっ!? どうして繋がらないんだ!?」", image: "assets/mascot_error.jpg" }
+        };
+
+        const speechBubble = document.getElementById('speechBubble');
+        const mascotImage = document.getElementById('mascotImage');
+        const buttons = document.querySelectorAll('.state-btn');
+
+        window.setMascotState = function(stateKey) {
+            const stateData = states[stateKey];
+            if (!stateData) return;
+
+            // Update UI text & image
+            speechBubble.textContent = stateData.text;
+            mascotImage.src = stateData.image;
+
+            // Update active button state
+            buttons.forEach(btn => {
+                if (btn.getAttribute('data-state') === stateKey) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        };
+
+        buttons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const stateKey = btn.getAttribute('data-state');
+                setMascotState(stateKey);
+            });
+        });
+    </script>
+</body>
+</html>
