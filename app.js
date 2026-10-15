@@ -3577,33 +3577,22 @@ const LIVING_MASCOT_ROOMS = {
 let mascotCurrentRoom = 'mylist';
 let mascotCurrentDialogue = LIVING_MASCOT_ROOMS.mylist.dialogues[0];
 let mascotMoveTimer = null;
-let mascotIdleTimer = null;
 let isBubbleOpen = true;
-let mascotTapCount = 0;
-let isMascotSleeping = false;
-let lastInteractionTime = Date.now();
 
 function initLivingMascot() {
   const roomKeys = Object.keys(LIVING_MASCOT_ROOMS);
   mascotCurrentRoom = roomKeys[Math.floor(Math.random() * roomKeys.length)];
   pickRandomDialogueForCurrentRoom();
+
   setRandomMascotPosition();
 
   if (mascotMoveTimer) clearInterval(mascotMoveTimer);
   mascotMoveTimer = setInterval(() => {
-    if (!isMascotSleeping) strollOrMoveMascot();
-  }, 45000);
-
-  if (mascotIdleTimer) clearInterval(mascotIdleTimer);
-  mascotIdleTimer = setInterval(() => {
-    if (Date.now() - lastInteractionTime > 30000 && !isMascotSleeping) {
-      goToSleep();
-    }
-  }, 10000);
+    strollOrMoveMascot();
+  }, 55000);
 
   updateLivingMascotUI();
   setupMascotDragAndDrop();
-  setupMascotReactivityHooks();
 }
 
 function pickRandomDialogueForCurrentRoom() {
@@ -3614,13 +3603,13 @@ function pickRandomDialogueForCurrentRoom() {
 
 function strollOrMoveMascot() {
   const roomKeys = Object.keys(LIVING_MASCOT_ROOMS);
-  if (Math.random() < 0.65) {
+  if (Math.random() < 0.7) {
     const otherRooms = roomKeys.filter(k => k !== mascotCurrentRoom);
     mascotCurrentRoom = otherRooms[Math.floor(Math.random() * otherRooms.length)];
   }
   pickRandomDialogueForCurrentRoom();
-  isBubbleOpen = Math.random() > 0.3;
-  shiftMascotPositionSmoothly();
+  isBubbleOpen = Math.random() > 0.35;
+  shiftMascotPositionRandomly();
   updateLivingMascotUI();
 }
 
@@ -3629,39 +3618,24 @@ function setRandomMascotPosition() {
   if (!widget) return;
   const maxX = window.innerWidth - 180;
   const maxY = window.innerHeight - 150;
-  widget.style.left = Math.max(20, Math.floor(Math.random() * maxX)) + 'px';
-  widget.style.top = Math.max(80, Math.floor(Math.random() * maxY)) + 'px';
+  const rx = Math.max(20, Math.floor(Math.random() * maxX));
+  const ry = Math.max(80, Math.floor(Math.random() * maxY));
+  widget.style.left = rx + 'px';
+  widget.style.top = ry + 'px';
   widget.style.bottom = 'auto';
   widget.style.right = 'auto';
 }
 
-function shiftMascotPositionSmoothly() {
+function shiftMascotPositionRandomly() {
   const widget = document.getElementById('livingMascotWidget');
   if (!widget) return;
   const rect = widget.getBoundingClientRect();
-  const newX = Math.max(15, Math.min(window.innerWidth - 160, rect.left + (Math.random() - 0.5) * 100));
-  const newY = Math.max(60, Math.min(window.innerHeight - 140, rect.top + (Math.random() - 0.5) * 80));
-  widget.style.transition = 'left 0.8s ease, top 0.8s ease';
+  const dx = (Math.random() - 0.5) * 120;
+  const dy = (Math.random() - 0.5) * 100;
+  let newX = Math.max(15, Math.min(window.innerWidth - 160, rect.left + dx));
+  let newY = Math.max(60, Math.min(window.innerHeight - 140, rect.top + dy));
   widget.style.left = newX + 'px';
   widget.style.top = newY + 'px';
-  setTimeout(() => { widget.style.transition = 'transform 0.1s ease'; }, 800);
-}
-
-function goToSleep() {
-  isMascotSleeping = true;
-  mascotCurrentDialogue = { state: 'sleep', text: "「スーー…すーー…（ZZZ）」", image: "assets/mascot_relaxed.jpg" };
-  isBubbleOpen = true;
-  updateLivingMascotUI();
-}
-
-function wakeUp() {
-  if (!isMascotSleeping) return;
-  isMascotSleeping = false;
-  lastInteractionTime = Date.now();
-  pickRandomDialogueForCurrentRoom();
-  isBubbleOpen = true;
-  updateLivingMascotUI();
-  showMascotPopupNotification("はっ！起きたよ！");
 }
 
 function getCurrentActiveMainTab() {
@@ -3687,10 +3661,14 @@ function updateLivingMascotUI() {
     widget.classList.remove('hidden');
     if (bubble) bubble.textContent = mascotCurrentDialogue.text;
     if (img) img.src = mascotCurrentDialogue.image;
-    if (badge) badge.textContent = isMascotSleeping ? "就寝中" : roomInfo.name;
+    if (badge) badge.textContent = roomInfo.name;
+
     if (bubbleWrap) {
-      if (isBubbleOpen) bubbleWrap.classList.remove('hidden');
-      else bubbleWrap.classList.add('hidden');
+      if (isBubbleOpen) {
+        bubbleWrap.classList.remove('hidden');
+      } else {
+        bubbleWrap.classList.add('hidden');
+      }
     }
   } else {
     widget.classList.add('hidden');
@@ -3699,22 +3677,24 @@ function updateLivingMascotUI() {
 
 function setupMascotDragAndDrop() {
   const widget = document.getElementById('livingMascotWidget');
-  const handle = document.getElementById('livingMascotHandle');
-  if (!widget || !handle) return;
+  if (!widget) return;
 
-  let isDragging = false, startX = 0, startY = 0, initialX = 0, initialY = 0;
+  let isDragging = false;
+  let startX = 0, startY = 0;
+  let initialX = 0, initialY = 0;
 
   function dragStart(e) {
     if (e.target.closest('button')) return;
     isDragging = true;
-    lastInteractionTime = Date.now();
-    if (isMascotSleeping) { wakeUp(); return; }
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    startX = clientX; startY = clientY;
+    startX = clientX;
+    startY = clientY;
     const rect = widget.getBoundingClientRect();
-    initialX = rect.left; initialY = rect.top;
-    widget.style.bottom = 'auto'; widget.style.right = 'auto';
+    initialX = rect.left;
+    initialY = rect.top;
+    widget.style.bottom = 'auto';
+    widget.style.right = 'auto';
     e.preventDefault();
   }
 
@@ -3722,18 +3702,29 @@ function setupMascotDragAndDrop() {
     if (!isDragging) return;
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    let newX = initialX + (clientX - startX);
-    let newY = initialY + (clientY - startY);
+    const dx = clientX - startX;
+    const dy = clientY - startY;
+
+    let newX = initialX + dx;
+    let newY = initialY + dy;
+
     newX = Math.max(10, Math.min(window.innerWidth - widget.offsetWidth - 10, newX));
     newY = Math.max(50, Math.min(window.innerHeight - widget.offsetHeight - 10, newY));
+
     widget.style.left = newX + 'px';
     widget.style.top = newY + 'px';
   }
 
-  function dragEnd() { isDragging = false; }
+  function dragEnd() {
+    if (!isDragging) return;
+    isDragging = false;
+  }
 
-  handle.addEventListener('mousedown', dragStart);
-  handle.addEventListener('touchstart', dragStart, { passive: false });
+  const handle = document.getElementById('livingMascotHandle');
+  if (handle) {
+    handle.addEventListener('mousedown', dragStart);
+    handle.addEventListener('touchstart', dragStart, { passive: false });
+  }
   window.addEventListener('mousemove', dragMove);
   window.addEventListener('touchmove', dragMove, { passive: false });
   window.addEventListener('mouseup', dragEnd);
@@ -3741,50 +3732,15 @@ function setupMascotDragAndDrop() {
 
   handle.addEventListener('click', (e) => {
     if (isDragging) return;
-    lastInteractionTime = Date.now();
-    if (isMascotSleeping) { wakeUp(); return; }
-    mascotTapCount++;
-    if (mascotTapCount >= 4) {
-      mascotTapCount = 0;
-      mascotCurrentDialogue = { state: 'angry', text: "「ちょっと！羽毛が乱れるでしょ！」", image: "assets/mascot_focused.jpg" };
-    } else if (mascotTapCount === 3) {
-      mascotCurrentDialogue = { state: 'happy', text: "「なでてくれてるの？…ありがとっ♪」", image: "assets/mascot_happy.jpg" };
-    } else {
-      const room = LIVING_MASCOT_ROOMS[mascotCurrentRoom];
-      const list = room.dialogues;
-      let idx = list.findIndex(d => d.text === mascotCurrentDialogue.text);
-      idx = (idx + 1) % list.length;
-      mascotCurrentDialogue = list[idx];
-    }
+    const room = LIVING_MASCOT_ROOMS[mascotCurrentRoom];
+    const list = room.dialogues;
+    let idx = list.findIndex(d => d.text === mascotCurrentDialogue.text);
+    idx = (idx + 1) % list.length;
+    mascotCurrentDialogue = list[idx];
     isBubbleOpen = true;
     updateLivingMascotUI();
+    if (navigator.vibrate) navigator.vibrate(25);
   });
-}
-
-function setupMascotReactivityHooks() {
-  const searchInput = document.getElementById('searchInput');
-  if (searchInput) {
-    searchInput.addEventListener('input', (e) => {
-      lastInteractionTime = Date.now();
-      if (isMascotSleeping) wakeUp();
-      const val = e.target.value.trim();
-      if (val.length > 0 && Math.random() < 0.4) {
-        showMascotPopupNotification(`「${val}」を探してるんだね？任せて！`);
-      }
-    });
-  }
-}
-
-function showMascotPopupNotification(msg) {
-  const bubble = document.getElementById('livingMascotBubble');
-  const bubbleWrap = document.getElementById('mascotBubbleWrapper');
-  if (bubble && bubbleWrap) {
-    const orig = bubble.textContent;
-    bubble.textContent = `「${msg}」`;
-    bubbleWrap.classList.remove('hidden');
-    isBubbleOpen = true;
-    setTimeout(() => { bubble.textContent = orig; }, 3500);
-  }
 }
 
 function toggleMascotSpeech(e) {
@@ -3792,11 +3748,20 @@ function toggleMascotSpeech(e) {
   isBubbleOpen = !isBubbleOpen;
   const bubbleWrap = document.getElementById('mascotBubbleWrapper');
   if (bubbleWrap) {
-    if (isBubbleOpen) bubbleWrap.classList.remove('hidden');
-    else bubbleWrap.classList.add('hidden');
+    if (isBubbleOpen) {
+      bubbleWrap.classList.remove('hidden');
+    } else {
+      bubbleWrap.classList.add('hidden');
+    }
   }
 }
 
+const origSwitchMainTab = window.switchMainTab;
+window.switchMainTab = function(tab) {
+  if (typeof origSwitchMainTab === 'function') origSwitchMainTab(tab);
+  setTimeout(updateLivingMascotUI, 50);
+};
+
 window.addEventListener('DOMContentLoaded', () => {
-  setTimeout(initLivingMascot, 300);
+  setTimeout(initLivingMascot, 200);
 });
