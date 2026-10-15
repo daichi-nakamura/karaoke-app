@@ -3286,3 +3286,202 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 render();
+
+
+
+// ==========================================
+// 🐦 アプリ内生活・自律移動型マスコットシステム
+// ==========================================
+const LIVING_MASCOT_ROOMS = {
+  mylist: {
+    name: "マイリスト",
+    dialogues: [
+      { state: 'normal', text: "「ここで何歌うか考え中…」", image: "assets/mascot_normal.jpg" },
+      { state: 'happy', text: "「お、いいマイリストだな！」", image: "assets/mascot_happy.jpg" },
+      { state: 'bored', text: "「同じ曲ばっかじゃないか？」", image: "assets/mascot_bored.jpg" }
+    ]
+  },
+  recommend: {
+    name: "名曲発掘",
+    dialogues: [
+      { state: 'focused', text: "「新しい名曲をリサーチ中…」", image: "assets/mascot_focused.jpg" },
+      { state: 'happy', text: "「これ掘り出し物だぞ！」", image: "assets/mascot_happy.jpg" },
+      { state: 'confused', text: "「この歌手、誰だっけ…？」", image: "assets/mascot_confused.jpg" }
+    ]
+  },
+  ranking: {
+    name: "流行曲",
+    dialogues: [
+      { state: 'playback', text: "「今の流行りはこれかぁ」", image: "assets/mascot_playback.jpg" },
+      { state: 'happy', text: "「みんなこの曲好きだな！」", image: "assets/mascot_happy.jpg" },
+      { state: 'bored', text: "「ミーハーだな全く」", image: "assets/mascot_bored.jpg" }
+    ]
+  },
+  analysis: {
+    name: "マイ分析",
+    dialogues: [
+      { state: 'focused', text: "「フムフム、点数を分析分析…」", image: "assets/mascot_focused.jpg" },
+      { state: 'relaxed', text: "「データ見てたら眠くなってきた…」", image: "assets/mascot_relaxed.jpg" },
+      { state: 'error', text: "「平均点が下がってるぞ!?」", image: "assets/mascot_error.jpg" }
+    ]
+  }
+};
+
+let mascotCurrentRoom = 'mylist';
+let mascotCurrentDialogue = LIVING_MASCOT_ROOMS.mylist.dialogues[0];
+let mascotMoveTimer = null;
+let mascotSecondsUntilMove = 45;
+
+function initLivingMascot() {
+  // Pick initial random room
+  const roomKeys = Object.keys(LIVING_MASCOT_ROOMS);
+  mascotCurrentRoom = roomKeys[Math.floor(Math.random() * roomKeys.length)];
+  pickRandomDialogueForCurrentRoom();
+  
+  // Start movement interval (every 45 seconds)
+  if (mascotMoveTimer) clearInterval(mascotMoveTimer);
+  mascotMoveTimer = setInterval(() => {
+    moveMascotToAnotherRoom();
+  }, 45000);
+
+  // Start countdown ticker
+  setInterval(() => {
+    mascotSecondsUntilMove--;
+    if (mascotSecondsUntilMove <= 0) mascotSecondsUntilMove = 45;
+    const timerEl = document.getElementById('mascotTimerText');
+    if (timerEl) timerEl.textContent = `移動まであと ${mascotSecondsUntilMove}秒`;
+  }, 1000);
+
+  updateLivingMascotUI();
+}
+
+function pickRandomDialogueForCurrentRoom() {
+  const room = LIVING_MASCOT_ROOMS[mascotCurrentRoom];
+  const list = room.dialogues;
+  mascotCurrentDialogue = list[Math.floor(Math.random() * list.length)];
+}
+
+function moveMascotToAnotherRoom() {
+  const roomKeys = Object.keys(LIVING_MASCOT_ROOMS).filter(k => k !== mascotCurrentRoom);
+  const nextRoom = roomKeys[Math.floor(Math.random() * roomKeys.length)];
+  mascotCurrentRoom = nextRoom;
+  pickRandomDialogueForCurrentRoom();
+  mascotSecondsUntilMove = 45;
+
+  updateLivingMascotUI();
+  
+  // If user is currently in that room, play a subtle bounce or notification
+  const activeTab = getCurrentActiveMainTab();
+  if (activeTab === mascotCurrentRoom) {
+    showMascotPopupNotification("トコトコ…お邪魔するよ！");
+  }
+}
+
+function getCurrentActiveMainTab() {
+  if (!document.getElementById('viewMyList').classList.contains('hidden')) return 'mylist';
+  if (!document.getElementById('viewRecommend').classList.contains('hidden')) return 'recommend';
+  if (!document.getElementById('viewRanking').classList.contains('hidden')) return 'ranking';
+  if (!document.getElementById('viewAnalysis').classList.contains('hidden')) return 'analysis';
+  return 'mylist';
+}
+
+function updateLivingMascotUI() {
+  const widget = document.getElementById('livingMascotWidget');
+  const bubble = document.getElementById('livingMascotBubble');
+  const img = document.getElementById('livingMascotImage');
+  const badge = document.getElementById('mascotRoomBadge');
+  const headerStatus = document.getElementById('mascotHeaderStatusText');
+
+  const activeTab = getCurrentActiveMainTab();
+  const roomInfo = LIVING_MASCOT_ROOMS[mascotCurrentRoom];
+
+  if (headerStatus) {
+    headerStatus.textContent = `🐦 相棒: ${roomInfo.name}の部屋にいるよ`;
+  }
+
+  // Mascot only shows up if user is in the room where mascot currently resides!
+  if (activeTab === mascotCurrentRoom) {
+    if (widget) {
+      widget.classList.remove('hidden');
+      requestAnimationFrame(() => {
+        widget.classList.remove('translate-y-2', 'opacity-0');
+      });
+    }
+    if (bubble) bubble.textContent = mascotCurrentDialogue.text;
+    if (img) img.src = mascotCurrentDialogue.image;
+    if (badge) badge.textContent = roomInfo.name;
+  } else {
+    if (widget) {
+      widget.classList.add('translate-y-2', 'opacity-0');
+      setTimeout(() => { widget.classList.add('hidden'); }, 300);
+    }
+  }
+}
+
+function tapLivingMascot() {
+  // Cycle dialogue on tap
+  const room = LIVING_MASCOT_ROOMS[mascotCurrentRoom];
+  const list = room.dialogues;
+  let idx = list.findIndex(d => d.text === mascotCurrentDialogue.text);
+  idx = (idx + 1) % list.length;
+  mascotCurrentDialogue = list[idx];
+  updateLivingMascotUI();
+  if (navigator.vibrate) navigator.vibrate(30);
+}
+
+function toggleMascotSpeech() {
+  const widget = document.getElementById('livingMascotWidget');
+  if (widget) {
+    widget.classList.add('translate-y-2', 'opacity-0');
+    setTimeout(() => { widget.classList.add('hidden'); }, 300);
+  }
+}
+
+function showMascotStatusModal() {
+  const modal = document.getElementById('mascotStatusModal');
+  const detail = document.getElementById('mascotModalDetailText');
+  const roomInfo = LIVING_MASCOT_ROOMS[mascotCurrentRoom];
+  if (detail) {
+    detail.textContent = `現在、アプリ内の「${roomInfo.name}」の部屋で生活しています。
+（セリフ: ${mascotCurrentDialogue.text}）`;
+  }
+  if (modal) modal.classList.remove('hidden');
+  lockBodyScroll(true);
+}
+
+function closeMascotStatusModal() {
+  const modal = document.getElementById('mascotStatusModal');
+  if (modal) modal.classList.add('hidden');
+  lockBodyScroll(false);
+}
+
+window.summonMascotToCurrentTab = function() {
+  const activeTab = getCurrentActiveMainTab();
+  mascotCurrentRoom = activeTab;
+  pickRandomDialogueForCurrentRoom();
+  mascotSecondsUntilMove = 45;
+  closeMascotStatusModal();
+  updateLivingMascotUI();
+  showMascotPopupNotification("呼ばれて飛び出てジャジャジャジャーン！");
+};
+
+function showMascotPopupNotification(msg) {
+  const bubble = document.getElementById('livingMascotBubble');
+  if (bubble) {
+    const orig = bubble.textContent;
+    bubble.textContent = `「${msg}」`;
+    setTimeout(() => { bubble.textContent = orig; }, 3500);
+  }
+}
+
+// Hook into switchMainTab to re-evaluate mascot visibility immediately
+const origSwitchMainTab = window.switchMainTab;
+window.switchMainTab = function(tab) {
+  if (typeof origSwitchMainTab === 'function') origSwitchMainTab(tab);
+  setTimeout(updateLivingMascotUI, 50);
+};
+
+// Initialize on load
+window.addEventListener('DOMContentLoaded', () => {
+  setTimeout(initLivingMascot, 200);
+});
