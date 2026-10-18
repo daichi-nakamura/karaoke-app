@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>OHAKO</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- QRコード生成ライブラリ (外部依存最小限・軽量版) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     body { -webkit-tap-highlight-color: transparent; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -427,6 +429,9 @@
           <button type="button" onclick="copyCardShareUrl()" id="btnCopyCardUrl" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap">
             コピー
           </button>
+          <button type="button" onclick="showShareQRCode(document.getElementById('cardShareUrlInput').value, '十八番名刺')" class="bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap">
+            📱 QR
+          </button>
         </div>
       </div>
 
@@ -435,6 +440,23 @@
           閉じる
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- ==================== QRコード表示専用モーダル ==================== -->
+  <div id="qrCodeModal" class="fixed inset-0 z-[80] bg-black/85 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-xs rounded-2xl p-5 shadow-2xl space-y-4 text-center my-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+        <h3 id="qrModalTitle" class="text-sm font-bold text-white">QRコードで共有</h3>
+        <button onclick="closeShareQRCode()" class="text-slate-400 hover:text-white text-xs p-1">✕</button>
+      </div>
+      <div class="flex justify-center p-3 bg-white rounded-xl shadow-inner mx-auto w-fit">
+        <div id="qrCanvasContainer"></div>
+      </div>
+      <p class="text-[11px] text-slate-400">スマホのカメラでスキャンしてアクセスできます</p>
+      <button onclick="closeShareQRCode()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 py-2 rounded-xl text-xs font-bold">
+        閉じる
+      </button>
     </div>
   </div>
 
@@ -462,17 +484,17 @@
     </div>
   </div>
 
-  <!-- ==================== ゲスト遮断：OHAKO紹介ウェルカム画面 ==================== -->
+  <!-- ==================== ゲスト遮断：OHAKO紹介ウェルカム画面 (完全センター配置 & 改行適正化) ==================== -->
   <div id="cardWelcomeModal" class="fixed inset-0 z-[75] bg-slate-950 hidden overflow-y-auto p-4">
     <div class="max-w-md mx-auto space-y-5 my-auto py-8">
-      <!-- ロゴヘッダー (ドット削除・完全センター配置) -->
-      <div class="text-center space-y-2">
-        <div class="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 border border-indigo-400/30">
+      <!-- ロゴヘッダー (完全センター配置) -->
+      <div class="flex flex-col items-center justify-center space-y-2.5 text-center">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 border border-indigo-400/30">
           <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
           </svg>
         </div>
-        <div class="flex justify-center">
+        <div class="flex items-center justify-center w-full">
           <svg class="h-8 w-32" viewBox="0 0 120 32" fill="none" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="ohakoGradWelcome" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -481,17 +503,17 @@
                 <stop offset="100%" stop-color="#F472B6" />
               </linearGradient>
             </defs>
-            <text x="0" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="900" letter-spacing="3.5" fill="url(#ohakoGradWelcome)">OHAKO</text>
+            <text x="60" y="24" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="900" letter-spacing="3.5" fill="url(#ohakoGradWelcome)">OHAKO</text>
           </svg>
         </div>
       </div>
 
-      <!-- プロダクトステートメント全文掲出（改行位置・文脈保護） -->
+      <!-- プロダクトステートメント全文掲出（改行位置の最適化） -->
       <div class="bg-indigo-950/40 border border-indigo-900/60 p-4 rounded-2xl text-center space-y-2">
         <p class="text-xs text-indigo-200 font-semibold leading-relaxed statement-text">
           自分の声を、誰よりも熟知している相棒と。<br>
-          出会う楽しみも、歌う歓びも、<br class="hidden sm:inline">もっと自由に、もっと自分らしく。<br>
-          あなたの「十八番（OHAKO）」をともに紡ぐ、<br class="hidden sm:inline">スマート・レパートリーパートナー。
+          出会う楽しみも、歌う歓びも、もっと自由に、もっと自分らしく。<br>
+          あなたの「十八番（OHAKO）」をともに紡ぐ、スマート・レパートリーパートナー。
         </p>
       </div>
 
@@ -522,7 +544,7 @@
 
       <!-- アクション動線 -->
       <div class="space-y-2 pt-2">
-        <button onclick="reopenSharedCard()" class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-indigo-300 py-3 rounded-xl font-bold text-xs transition">
+        <button id="btnReopenSharedCard" onclick="reopenSharedCard()" class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-indigo-300 py-3 rounded-xl font-bold text-xs transition">
           📇 名刺をもう一度見る
         </button>
         <button onclick="startMyOwnOhako()" class="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white py-3 rounded-xl font-bold text-xs shadow-lg transition">
@@ -655,8 +677,8 @@
         <div class="flex items-center gap-2.5">
           <span class="text-xl">📖</span>
           <div>
-            <div class="text-xs font-bold text-indigo-200 group-hover:text-white">ご利用ガイド・指標の見方</div>
-            <div class="text-[10px] text-slate-400">分析ロジックや各機能のポイントを確認</div>
+            <div class="text-xs font-bold text-indigo-200 group-hover:text-white">ご利用ガイド・取扱説明書</div>
+            <div class="text-[10px] text-slate-400">データの注意点・APIキー取得手順・分析指標</div>
           </div>
         </div>
         <span class="text-xs text-indigo-400 font-bold group-hover:translate-x-0.5 transition-transform">➔</span>
@@ -672,17 +694,23 @@
           <input type="password" id="geminiApiKeyInput" placeholder="AIzaSy..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none">
           <button type="button" onclick="saveGeminiApiKey()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap">保存</button>
         </div>
+        <div class="text-[10px] text-slate-500">※取得方法は上部の「📖 ご利用ガイド」をご覧ください。</div>
       </div>
 
-      <!-- 名刺共有セクション -->
+      <!-- 名刺共有 ＆ アプリ紹介URLセクション -->
       <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-2">
-        <span class="text-xs font-bold text-sky-400">📇 私の十八番名刺を発行</span>
+        <span class="text-xs font-bold text-sky-400">📇 シェア & 紹介リンク</span>
         <p class="text-[11px] text-slate-400 leading-relaxed">
-          あなたの持ち曲を相手のスマホで見せられるURLを発行します（公開範囲を選択可能）。
+          あなたの持ち曲名刺や、OHAKOアプリ単体の紹介リンクを発行・QRコード表示できます。
         </p>
-        <button onclick="openCardShareModal()" class="w-full bg-slate-800 hover:bg-slate-700 text-sky-300 py-1.5 rounded-lg text-xs font-medium border border-slate-700 flex items-center justify-center gap-1">
-          <span>🔗 名刺URLを発行</span>
-        </button>
+        <div class="grid grid-cols-2 gap-1.5">
+          <button onclick="openCardShareModal()" class="bg-slate-800 hover:bg-slate-700 text-sky-300 py-1.5 rounded-lg text-xs font-medium border border-slate-700 flex items-center justify-center gap-1">
+            <span>🔗 名刺を発行</span>
+          </button>
+          <button onclick="copyDirectIntroUrl()" class="bg-slate-800 hover:bg-slate-700 text-indigo-300 py-1.5 rounded-lg text-xs font-medium border border-slate-700 flex items-center justify-center gap-1">
+            <span>📣 紹介リンク</span>
+          </button>
+        </div>
       </div>
 
       <!-- AI音域補完セクション -->
@@ -760,6 +788,50 @@
       </div>
 
       <div class="flex-1 overflow-y-auto no-scrollbar space-y-4 text-xs pr-1">
+
+        <!-- ⚠️ 【超重要】デモモードでのデータ保持と消失リスクについて -->
+        <div class="bg-amber-950/70 border border-amber-600/80 p-3 rounded-xl space-y-2 leading-relaxed">
+          <div class="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
+            <span>⚠️</span>
+            <span>【超重要】端末保存（デモモード）のデータ消失リスクと対策</span>
+          </div>
+          <p class="text-[11px] text-amber-100">
+            お試し体験中（デモモード）は、曲データが<strong>お使いのブラウザ内部（LocalStorage）にのみ保存</strong>されています。そのため、以下の操作を行うとデータが完全に消えてしまいます。
+          </p>
+          <ul class="text-[10px] text-amber-200 list-disc list-inside space-y-0.5 pl-1">
+            <li>ブラウザの「履歴・Cookie・キャッシュの消去」を実行した時</li>
+            <li>SafariやChromeの「プライベートブラウズ / シークレットモード」を閉じた時</li>
+            <li>スマホの空き容量不足によりOSがブラウザ一時データを自動クリーンアップした時</li>
+            <li>別の端末や別のブラウザアプリで開いた時（端末間では同期されません）</li>
+          </ul>
+          <div class="pt-1 border-t border-amber-800/80 text-[10px] text-white">
+            🛡️ <strong>必須の対策:</strong> 大切な持ち曲データを保護するため、⚙️設定画面の<strong>「💾 データの保護 & バックアップ ➜ 📥 保存 (JSON)」</strong>から、定期的にJSONファイルを端末やクラウドにダウンロード保存してください！
+          </div>
+        </div>
+
+        <!-- 🔑 Gemini APIキーの無料取得手順 -->
+        <div class="space-y-2">
+          <div class="text-[11px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1">
+            <span>🔑</span>
+            <span>Gemini APIキーの取得方法（無料・約2分）</span>
+          </div>
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2 text-[11px] text-slate-300 leading-relaxed">
+            <p class="text-slate-400">
+              「💡 空気読み選曲」や「🤖 勝手にカラオケ総括」でGoogleの最先端AIを利用するには、無料のAPIキーが必要です。
+            </p>
+            <ol class="list-decimal list-inside space-y-1 text-slate-300">
+              <li>ブラウザで「<strong>Google AI Studio</strong>」にアクセスします。</li>
+              <li>Googleアカウントでログインします。</li>
+              <li>画面左上の「<strong>Get API key</strong>」ボタンをタップします。</li>
+              <li>「<strong>Create API key</strong>」を押してキーを生成し、コピーします。</li>
+              <li>OHAKOの ⚙️管理設定を開き、「Gemini API 設定」欄に貼り付けて「保存」を押します。</li>
+            </ol>
+            <div class="text-[10px] text-indigo-400 font-mono pt-1">
+              ※標準的な個人利用枠の範囲であれば完全無料でご利用いただけます。
+            </div>
+          </div>
+        </div>
+
         <!-- 1. はじめに（初期設定 & 準備） -->
         <div class="space-y-2">
           <div class="text-[11px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1">
@@ -768,8 +840,8 @@
           </div>
           <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2 leading-relaxed text-slate-300">
             <div>
-              <strong class="text-white block">・Firebase設定（必須）:</strong>
-              <span class="text-[11px] text-slate-400">持ち曲や歌唱履歴をご自身のクラウド上に安全に保存・同期するための設定です（<code>firebase-config.js</code> に記述）。</span>
+              <strong class="text-white block">・Firebase設定（任意・本番用）:</strong>
+              <span class="text-[11px] text-slate-400">持ち曲や歌唱履歴をご自身のクラウド上に安全に保存・同期するための設定です（<code>firebase-config.js</code> に記述）。未設定の場合は自動でデモモードが稼働します。</span>
             </div>
             <div>
               <strong class="text-white block">・Gemini API設定（任意・推奨）:</strong>
