@@ -22,7 +22,7 @@ function calculateRecommendedKey(maxPitchStr) {
   const diff = safeRank - targetRank;
   
   if (diff >= 0) {
-    return { diff: 0, text: `原曲キー推奨 (上限:${safePitchName}内)` };
+    return { diff: 0, text: `原曲キー推奨 (上限:${safePitchName}に余裕あり)` };
   } else {
     return { diff: diff, text: `推奨: ${diff} (${safePitchName}に適合)` };
   }
@@ -1071,7 +1071,7 @@ window.startDataMigration = async function() {
   if (!window.songs || window.songs.length === 0) return alert("曲データが存在しません。");
   const progressEl = document.getElementById('migrateProgressText');
   const btnEl = document.getElementById('btnMigrate');
-  const targets = window.songs.filter(s => !s.artwork || !s.previewUrl || !s.durationMs || !s.year);
+  const targets = window.songs.filter(s => !s.artwork || !s.previewUrl || !s.durationMs || !s.year || s.isWarmup === undefined);
   
   if (targets.length === 0) return alert("✨ すべての曲データはすでに最新情報で補完されています！");
   if (!confirm(`全${window.songs.length}曲中、未補完の曲が【${targets.length}曲】見つかりました。\niTunesから情報を自動取得して更新しますか？`)) return;
@@ -1101,6 +1101,16 @@ window.startDataMigration = async function() {
         if (!s.year && hit.releaseDate) patch.year = hit.releaseDate.substring(0, 4);
         if (!s.genre && hit.primaryGenreName) patch.genre = hit.primaryGenreName;
         if (!s.duetType) patch.duetType = checkIsDuet(hit.trackName, hit.artistName) ? 'duet' : 'solo';
+
+        // ウォームアップ適性の未設定曲に対する自動評価（ユーザー設定値は保護）
+        if (s.isWarmup === undefined) {
+          const autoWarm = evaluateWarmupSuitability({
+            durationMs: s.durationMs || patch.durationMs || 0,
+            maxPitch: s.maxPitch || patch.maxPitch || '',
+            score: s.score || '歌える'
+          });
+          patch.isWarmup = autoWarm;
+        }
 
         if (Object.keys(patch).length > 0) {
           if (isDemoMode) {
@@ -1762,9 +1772,14 @@ window.selectITunesSong = function(encoded) {
   document.getElementById('formDurationMs').value = data.durationMs || 0;
   document.getElementById('formDuetType').value = data.isDuet ? 'duet' : 'solo';
   document.getElementById('formTags').value = (data.tags || []).join(', ');
-  const autoWarm = evaluateWarmupSuitability({ durationMs: data.durationMs || 0, maxPitch: '', score: '歌える' });
-  const warmupEl = document.getElementById('formIsWarmup');
-  if (warmupEl) warmupEl.checked = autoWarm;
+  
+  // 完全新規登録時のみウォームアップを自動判定（編集画面での再検索時は既存設定を保護）
+  const editId = document.getElementById('editSongId')?.value;
+  if (!editId) {
+    const autoWarm = evaluateWarmupSuitability({ durationMs: data.durationMs || 0, maxPitch: '', score: '歌える' });
+    const warmupEl = document.getElementById('formIsWarmup');
+    if (warmupEl) warmupEl.checked = autoWarm;
+  }
   document.getElementById('apiSearchResults').classList.add('hidden');
   document.getElementById('apiSortRow').classList.add('hidden');
 };
@@ -2604,14 +2619,15 @@ window.openEditModal = function(id) {
   document.getElementById('formKey').value = s.key || '0';
   document.getElementById('formScore').value = s.score || 'これから';
   const warmupEl = document.getElementById('formIsWarmup');
-  if (warmupEl) warmupEl.checked = !!s.isWarmup;
+  if (warmupEl) warmupEl.checked = !!s.isWarmup; // 手動設定を100%保持
+  
   const sugEl = document.getElementById('formKeySuggestionText');
   if (sugEl) {
     if (s.maxPitch) {
       const rec = calculateRecommendedKey(s.maxPitch);
       sugEl.innerHTML = rec.text ? `<button type="button" onclick="applySuggestedKey('${rec.diff}')" class="underline hover:text-white">💡 ${rec.text}</button>` : '';
     } else {
-      sugEl.textContent = '';
+      sugEl.innerHTML = '<span class="text-slate-500 text-[10px]">※最高音の登録でキー診断</span>';
     }
   }
   document.getElementById('formTags').value = (s.tags || []).join(', ');
@@ -3407,7 +3423,7 @@ async function generateCardShareLink() {
 
   let finalUrl = '';
   // 方式A: Firestoreが利用可能な場合は shared_cards コレクションに短縮保存
-  if (!isDemoMode && window.firestoreOps && window.db) {
+  if (window.firestoreOps && window.db) {
     try {
       const { collection, addDoc } = window.firestoreOps;
       const docRef = await addDoc(collection(window.db, "shared_cards"), {
