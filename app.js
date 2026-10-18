@@ -1,3 +1,103 @@
+// ==========================================
+// 🎯 キー調整シミュレーター & ☕️ ウォームアップ自動判定
+// ==========================================
+function getUserSafeMaxRank() {
+  const allSongs = window.songs || [];
+  const mastered = allSongs.filter(s => s.score === '得意' && getPitchRank(s.maxPitch) > 0);
+  if (mastered.length > 0) {
+    return Math.max(...mastered.map(s => getPitchRank(s.maxPitch)));
+  }
+  const scored = allSongs.filter(s => getPitchRank(s.maxPitch) > 0);
+  if (scored.length > 0) {
+    return Math.max(...scored.map(s => getPitchRank(s.maxPitch)));
+  }
+  return PITCH_RANK["hiA"] || 34; // デフォルト安全圏: hiA
+}
+
+function calculateRecommendedKey(maxPitchStr) {
+  const targetRank = getPitchRank(maxPitchStr);
+  if (targetRank === 0) return { diff: 0, text: "" };
+  const safeRank = getUserSafeMaxRank();
+  const safePitchName = getPitchNameFromRank(safeRank) || "hiA";
+  const diff = safeRank - targetRank;
+  
+  if (diff >= 0) {
+    return { diff: 0, text: `原曲キー推奨 (上限:${safePitchName}内)` };
+  } else {
+    return { diff: diff, text: `推奨: ${diff} (${safePitchName}に適合)` };
+  }
+}
+
+function evaluateWarmupSuitability(songObj) {
+  // 条件: 演奏時間が4分未満(240秒未満) かつ 最高音が安全圏以下 かつ 得意or歌える
+  const durMs = songObj.durationMs || 240000;
+  const isShort = durMs <= 245000;
+  const rank = getPitchRank(songObj.maxPitch);
+  const safeRank = getUserSafeMaxRank();
+  const isSafePitch = rank === 0 || rank <= safeRank + 1;
+  const isPlayable = songObj.score === '得意' || songObj.score === '歌える';
+  
+  return isShort && isSafePitch && isPlayable;
+}
+
+// ==========================================
+// 🗜️ デモモード用 TSV + Deflate 超圧縮エンジン
+// ==========================================
+async function compressCardDataToUrlHash(miniData) {
+  const scoreNumMap = { 'これから': '0', '練習中': '1', '歌える': '2', '得意': '3' };
+  const lines = miniData.map(d => `${d[0]}\t${d[1]}\t${d[2]}\t${scoreNumMap[d[3]] || '0'}\t${d[4] || ''}`);
+  const tsvText = lines.join('\n');
+
+  try {
+    if (typeof CompressionStream !== 'undefined') {
+      const stream = new Blob([new TextEncoder().encode(tsvText)]).stream().pipeThrough(new CompressionStream('deflate'));
+      const buffer = await new Response(stream).arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return 'z_' + btoa(binary);
+    }
+  } catch (e) {
+    console.warn("CompressionStream failed, fallback to raw base64:", e);
+  }
+  return btoa(encodeURIComponent(JSON.stringify(miniData)));
+}
+
+async function decompressCardDataFromUrlHash(hashPayload) {
+  if (hashPayload.startsWith('z_')) {
+    const rawB64 = hashPayload.substring(2);
+    try {
+      const binary = atob(rawB64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'));
+      const text = await new Response(stream).text();
+      
+      const numScoreMap = { '0': 'これから', '1': '練習中', '2': '歌える', '3': '得意' };
+      const lines = text.split('\n').filter(Boolean);
+      return lines.map(line => {
+        const parts = line.split('\t');
+        return [
+          parts[0] || '',
+          parts[1] || '',
+          parts[2] || '0',
+          numScoreMap[parts[3]] || parts[3] || 'これから',
+          parts[4] || ''
+        ];
+      });
+    } catch (err) {
+      console.error("Decompress error:", err);
+    }
+  }
+
+  // Legacy Base64 JSON fallback
+  const jsonStr = decodeURIComponent(atob(hashPayload));
+  return JSON.parse(jsonStr);
+}
+
+
 // app.js
 window.songs = [];
 let rankingSongs = [];
@@ -409,7 +509,7 @@ function renderFilterChips() {
   if (selectedDecade !== 'all') chips.push({ type: 'decade', label: `${selectedDecade.replace('s', '年代')}` });
   if (selectedScore !== 'all') chips.push({ type: 'score', label: `習熟度: ${selectedScore}` });
   if (selectedAttr !== 'all') {
-    const map = { original: '原曲キー', adjusted: 'キー調整あり', duet: 'デュエット' };
+    const map = { original: '原曲キー', adjusted: 'キー調整あり', duet: 'デュエット', warmup: '☕️ ウォームアップ' };
     chips.push({ type: 'attr', label: map[selectedAttr] || selectedAttr });
   }
   if (selectedPitchRange !== 'all') {
@@ -715,6 +815,69 @@ window.reSearchBulkCandidate = async function(idx) {
   } catch (e) {
     alert("検索エラー: " + e.message);
   }
+  renderBulkPreview();
+};
+
+
+window.reSearchBulkCandidate = async function(idx) {
+  const item = bulkCandidateSongs[idx];
+  if (!item) return;
+  const q = `${item.title || ''} ${item.artist || ''}`.trim() || item.originalQuery;
+  if (!q) return alert("曲名または歌手名を入力してください。");
+
+  item.isReSearching = true;
+  renderBulkPreview();
+
+  try {
+    const data = await fetchITunesApi(q, 8);
+    const results = data.results || [];
+    if (results.length === 0) {
+      alert("「" + q + "」に一致する候補が見つかりませんでした。別の曲名・歌手名をお試しください。");
+      item.reSearchResults = [];
+    } else {
+      item.reSearchResults = results.map(hit => {
+        const year = hit.releaseDate ? hit.releaseDate.substring(0, 4) : '';
+        const mins = Math.floor((hit.trackTimeMillis || 0) / 60000);
+        const secs = Math.floor(((hit.trackTimeMillis || 0) % 60000) / 1000).toString().padStart(2, '0');
+        return {
+          title: hit.trackName,
+          artist: hit.artistName,
+          year: year,
+          genre: hit.primaryGenreName || 'J-Pop',
+          artwork: hit.artworkUrl100 || '',
+          previewUrl: hit.previewUrl || '',
+          duration: hit.trackTimeMillis ? `${mins}:${secs}` : '',
+          durationMs: hit.trackTimeMillis || 0,
+          isDuet: checkIsDuet(hit.trackName, hit.artistName)
+        };
+      });
+    }
+  } catch (err) {
+    alert("再検索エラー: " + err.message);
+  } finally {
+    item.isReSearching = false;
+    renderBulkPreview();
+  }
+};
+
+window.selectBulkReSearchResult = function(idx, rIdx) {
+  const item = bulkCandidateSongs[idx];
+  if (!item || !item.reSearchResults || !item.reSearchResults[rIdx]) return;
+  const hit = item.reSearchResults[rIdx];
+
+  item.title = hit.title;
+  item.artist = hit.artist;
+  item.year = hit.year;
+  item.genre = hit.genre;
+  item.artwork = hit.artwork;
+  item.previewUrl = hit.previewUrl;
+  item.duration = hit.duration;
+  item.durationMs = hit.durationMs;
+  item.duetType = hit.isDuet ? 'duet' : 'solo';
+  item.notFound = false;
+  item.reSearchResults = [];
+  item.isEditing = false;
+
   renderBulkPreview();
 };
 
@@ -1599,6 +1762,9 @@ window.selectITunesSong = function(encoded) {
   document.getElementById('formDurationMs').value = data.durationMs || 0;
   document.getElementById('formDuetType').value = data.isDuet ? 'duet' : 'solo';
   document.getElementById('formTags').value = (data.tags || []).join(', ');
+  const autoWarm = evaluateWarmupSuitability({ durationMs: data.durationMs || 0, maxPitch: '', score: '歌える' });
+  const warmupEl = document.getElementById('formIsWarmup');
+  if (warmupEl) warmupEl.checked = autoWarm;
   document.getElementById('apiSearchResults').classList.add('hidden');
   document.getElementById('apiSortRow').classList.add('hidden');
 };
@@ -1842,6 +2008,7 @@ function getCurrentFilteredSongs() {
     if (selectedAttr === 'original') matchesAttr = (s.key === '0' || s.key === '原曲' || !s.key);
     else if (selectedAttr === 'adjusted') matchesAttr = (s.key !== '0' && s.key !== '原曲' && s.key);
     else if (selectedAttr === 'duet') matchesAttr = s.duetType === 'duet';
+    else if (selectedAttr === 'warmup') matchesAttr = !!s.isWarmup;
 
     const matchesPitch = matchPitchRange(s.maxPitch, selectedPitchRange);
 
@@ -1971,6 +2138,7 @@ window.render = function() {
               ${s.scoreVal ? `<span class="bg-amber-950/80 text-amber-300 px-1 py-0.2 rounded border border-amber-700/80 font-mono font-bold">🎯 ${s.scoreVal}点</span>` : ''}
               ${s.singCount ? `<span class="bg-indigo-950/70 text-indigo-300 px-1 py-0.2 rounded border border-indigo-800/70 font-mono">🔥 ${s.singCount}回</span>` : ''}
               ${s.duetType === 'duet' ? '<span class="bg-purple-950 text-purple-300 border border-purple-800">👥 デュエット</span>' : ''}
+              ${s.isWarmup ? '<span class="bg-amber-950/90 text-amber-300 border border-amber-700/80 px-1 py-0.2 rounded">☕️ ウォームアップ</span>' : ''}
             </div>
           </div>
 
@@ -2382,6 +2550,10 @@ function resetModalInputs() {
   document.getElementById('formDuetType').value = 'solo';
   document.getElementById('formKey').value = '0';
   document.getElementById('formScore').value = 'これから';
+  const warmupEl = document.getElementById('formIsWarmup');
+  if (warmupEl) warmupEl.checked = false;
+  const sugEl = document.getElementById('formKeySuggestionText');
+  if (sugEl) sugEl.textContent = '';
   
   document.getElementById('apiSearchResults').innerHTML = '';
   document.getElementById('apiSearchResults').classList.add('hidden');
@@ -2431,6 +2603,17 @@ window.openEditModal = function(id) {
   document.getElementById('formDuetType').value = s.duetType || 'solo';
   document.getElementById('formKey').value = s.key || '0';
   document.getElementById('formScore').value = s.score || 'これから';
+  const warmupEl = document.getElementById('formIsWarmup');
+  if (warmupEl) warmupEl.checked = !!s.isWarmup;
+  const sugEl = document.getElementById('formKeySuggestionText');
+  if (sugEl) {
+    if (s.maxPitch) {
+      const rec = calculateRecommendedKey(s.maxPitch);
+      sugEl.innerHTML = rec.text ? `<button type="button" onclick="applySuggestedKey('${rec.diff}')" class="underline hover:text-white">💡 ${rec.text}</button>` : '';
+    } else {
+      sugEl.textContent = '';
+    }
+  }
   document.getElementById('formTags').value = (s.tags || []).join(', ');
   document.getElementById('formMemo').value = s.memo || '';
   
@@ -2481,7 +2664,8 @@ window.handleSave = async function(e) {
     tags: tags,
     memo: document.getElementById('formMemo').value,
     singCount: parseInt(document.getElementById('formSingCount').value, 10) || 0,
-    lastSungAt: document.getElementById('formLastSungAt').value ? Number(document.getElementById('formLastSungAt').value) : null
+    lastSungAt: document.getElementById('formLastSungAt').value ? Number(document.getElementById('formLastSungAt').value) : null,
+    isWarmup: document.getElementById('formIsWarmup')?.checked || false
   };
 
   if (isDemoMode) {
@@ -3171,9 +3355,9 @@ ${songRows}
 let currentCardScope = 'mastered';
 let cachedSharedCardList = [];
 
-window.openCardShareModal = function() {
+window.openCardShareModal = async function() {
   closeSettingsModal();
-  selectCardScope('mastered');
+  await selectCardScope('mastered');
   document.getElementById('cardShareModal').classList.remove('hidden');
   lockBodyScroll(true);
 };
@@ -3183,7 +3367,7 @@ window.closeCardShareModal = function() {
   lockBodyScroll(false);
 };
 
-window.selectCardScope = function(scope) {
+window.selectCardScope = async function(scope) {
   currentCardScope = scope;
   ['mastered', 'main', 'all', 'pickup'].forEach(k => {
     const el = document.getElementById(`cardScope_${k}`);
@@ -3195,7 +3379,7 @@ window.selectCardScope = function(scope) {
     }
   });
 
-  generateCardShareLink();
+  await generateCardShareLink();
 };
 
 async function generateCardShareLink() {
