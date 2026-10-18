@@ -7,6 +7,7 @@ import {
   updateDoc, 
   deleteDoc, 
   doc, 
+  getDoc, 
   onSnapshot, 
   query, 
   orderBy 
@@ -31,7 +32,7 @@ try {
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     window.db = db;
-    window.firestoreOps = { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy };
+    window.firestoreOps = { collection, addDoc, updateDoc, deleteDoc, doc, getDoc, onSnapshot, query, orderBy };
     
     const q = query(collection(db, "songs"), orderBy("createdAt", "desc"));
     onSnapshot(q, (snapshot) => {
