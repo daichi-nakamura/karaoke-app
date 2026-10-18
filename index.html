@@ -608,6 +608,7 @@
           <button onclick="setAttrFilter('original')" class="attr-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="original">原曲キー</button>
           <button onclick="setAttrFilter('adjusted')" class="attr-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="adjusted">キー調整あり</button>
           <button onclick="setAttrFilter('duet')" class="attr-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="duet">👥 デュエット</button>
+          <button onclick="setAttrFilter('warmup')" class="attr-tab px-2.5 py-1 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 whitespace-nowrap shrink-0" data-val="warmup">☕️ ウォームアップ</button>
         </div>
       </div>
 
@@ -1049,7 +1050,10 @@
 
           <div class="grid grid-cols-3 gap-2">
             <div>
-              <label class="block text-xs text-slate-400 mb-1">キー設定</label>
+              <div class="flex items-center justify-between mb-1">
+                <label class="block text-xs text-slate-400">キー設定</label>
+                <span id="formKeySuggestionText" class="text-[10px] text-indigo-300 font-mono font-semibold"></span>
+              </div>
               <select id="formKey" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 focus:outline-none">
                 <option value="-6">-6</option>
                 <option value="-5">-5</option>
@@ -1093,6 +1097,20 @@
               <label class="block text-xs text-slate-400 mb-1">タグ（カンマ区切り）</label>
               <input type="text" id="formTags" placeholder="盛り上がる, バラード 等" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500">
             </div>
+          </div>
+
+          <div class="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-sm">☕️</span>
+              <div>
+                <div class="text-xs font-bold text-slate-200">ウォームアップ（1曲目候補）</div>
+                <div class="text-[10px] text-slate-400">入室直後の喉慣らしに最適な曲としてマーク</div>
+              </div>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="formIsWarmup" class="sr-only peer">
+              <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+            </label>
           </div>
 
           <div>
