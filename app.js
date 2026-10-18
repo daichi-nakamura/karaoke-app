@@ -622,41 +622,101 @@ function renderBulkPreview() {
             <span class="text-slate-300 font-mono bg-slate-900 px-1.5 py-0.2 rounded border border-slate-800">「${escapeHtml(s.originalQuery)}」</span>
           </span>
           <div class="flex items-center gap-1 shrink-0">
-            <button type="button" onclick="toggleEditBulkCandidate(${idx})" class="text-indigo-400 hover:text-indigo-300 px-1 text-xs font-semibold">
-              ${s.isEditing ? '完了' : '✏️ 修正'}
+            <button type="button" onclick="toggleEditBulkCandidate(${idx})" class="text-indigo-400 hover:text-indigo-300 px-1.5 py-0.5 rounded text-xs font-semibold bg-indigo-950 border border-indigo-800">
+              ${s.isEditing ? '完了 ✓' : '✏️ 修正'}
             </button>
             <button type="button" onclick="removeBulkCandidate(${idx})" class="text-slate-500 hover:text-rose-400 px-1 text-xs">✕ 除外</button>
           </div>
         </div>
 
-        <div class="flex items-center gap-2.5">
-          <div onclick="togglePlayPreview('${s.previewUrl || ''}', '${playId}', '${escapeHtml(s.title)}', '${escapeHtml(s.artist)}')" class="relative w-11 h-11 rounded-xl overflow-hidden shrink-0 cursor-pointer shadow border border-slate-800 bg-slate-800">
-            ${s.artwork ? `<img src="${s.artwork}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-slate-500 text-xs">🎵</div>`}
-            <div class="absolute inset-0 bg-black/40 flex items-center justify-center transition ${isPlaying ? 'opacity-100 bg-rose-950/70' : 'opacity-0 hover:opacity-100'}">
-              <span class="text-xs text-white">${isPlaying ? '⏹' : '▶'}</span>
+        ${s.isEditing ? `
+          <!-- インライン編集フォーム -->
+          <div class="p-2 bg-slate-900 rounded-lg border border-indigo-700/60 space-y-2">
+            <div class="grid grid-cols-2 gap-1.5">
+              <div>
+                <label class="block text-[9px] text-slate-400">曲名</label>
+                <input type="text" value="${escapeHtml(s.title)}" onchange="updateBulkField(${idx}, 'title', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-xs text-white">
+              </div>
+              <div>
+                <label class="block text-[9px] text-slate-400">歌手名</label>
+                <input type="text" value="${escapeHtml(s.artist)}" onchange="updateBulkField(${idx}, 'artist', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-xs text-white">
+              </div>
             </div>
-          </div>
-
-          <div class="min-w-0 flex-1">
-            <div class="font-bold text-white truncate flex items-center gap-1.5">
-              <span>${escapeHtml(s.title)}</span>
-              ${s.key !== '0' ? `<span class="text-[9px] bg-slate-800 text-indigo-300 border border-slate-700 px-1 rounded font-mono">${s.key}</span>` : ''}
-              <button type="button" onclick="cycleCandidateScore(${idx})" title="タップで習熟度を変更" class="text-[9px] px-1.5 py-0.2 rounded cursor-pointer transition active:scale-95 border ${scoreClass}">
-                ${s.score} 🔄
+            <div class="flex items-center justify-between gap-1.5 pt-0.5">
+              <div class="flex items-center gap-1.5">
+                <span class="text-[9px] text-slate-400">キー:</span>
+                <select onchange="updateBulkField(${idx}, 'key', this.value)" class="bg-slate-950 border border-slate-700 rounded px-1 py-0.5 text-[10px] text-slate-200">
+                  ${['-6','-5','-4','-3','-2','-1','0','+1','+2','+3','+4','+5','+6'].map(k => `<option value="${k}" ${s.key === k ? 'selected' : ''}>${k === '0' ? '原曲' : k}</option>`).join('')}
+                </select>
+              </div>
+              <button type="button" onclick="reSearchBulkCandidate(${idx})" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-2 py-0.5 rounded flex items-center gap-1">
+                🔄 iTunes再検索
               </button>
-              ${s.duetType === 'duet' ? '<span class="text-[9px] bg-purple-950 text-purple-300 border border-purple-800 px-1 rounded whitespace-nowrap">デュエット</span>' : ''}
-              ${s.isAlreadyAdded ? '<span class="text-[9px] bg-slate-800 text-slate-400 border border-slate-700 px-1 rounded whitespace-nowrap">登録済</span>' : ''}
-              ${s.notFound ? '<span class="text-[9px] bg-amber-950 text-amber-400 border border-amber-800 px-1 rounded whitespace-nowrap">情報なし</span>' : ''}
-            </div>
-            <div class="text-[10px] text-slate-400 truncate mt-0.5">
-              ${escapeHtml(s.artist) || '歌手未設定'} ${s.year ? '• ' + s.year + '年' : ''} ${s.genre ? '• ' + escapeHtml(s.genre) : ''}
             </div>
           </div>
-        </div>
+        ` : `
+          <div class="flex items-center gap-2.5">
+            <div onclick="togglePlayPreview('${s.previewUrl || ''}', '${playId}', '${escapeHtml(s.title)}', '${escapeHtml(s.artist)}')" class="relative w-11 h-11 rounded-xl overflow-hidden shrink-0 cursor-pointer shadow border border-slate-800 bg-slate-800">
+              ${s.artwork ? `<img src="${s.artwork}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-slate-500 text-xs">🎵</div>`}
+              <div class="absolute inset-0 bg-black/40 flex items-center justify-center transition ${isPlaying ? 'opacity-100 bg-rose-950/70' : 'opacity-0 hover:opacity-100'}">
+                <span class="text-xs text-white">${isPlaying ? '⏹' : '▶'}</span>
+              </div>
+            </div>
+
+            <div class="min-w-0 flex-1">
+              <div class="font-bold text-white truncate flex items-center gap-1.5">
+                <span>${escapeHtml(s.title)}</span>
+                ${s.key !== '0' ? `<span class="text-[9px] bg-slate-800 text-indigo-300 border border-slate-700 px-1 rounded font-mono">${s.key}</span>` : ''}
+                <button type="button" onclick="cycleCandidateScore(${idx})" title="タップで習熟度を変更" class="text-[9px] px-1.5 py-0.2 rounded cursor-pointer transition active:scale-95 border ${scoreClass}">
+                  ${s.score} 🔄
+                </button>
+                ${s.duetType === 'duet' ? '<span class="text-[9px] bg-purple-950 text-purple-300 border border-purple-800 px-1 rounded whitespace-nowrap">デュエット</span>' : ''}
+                ${s.isAlreadyAdded ? '<span class="text-[9px] bg-slate-800 text-slate-400 border border-slate-700 px-1 rounded whitespace-nowrap">登録済</span>' : ''}
+                ${s.notFound ? '<span class="text-[9px] bg-amber-950 text-amber-400 border border-amber-800 px-1 rounded whitespace-nowrap">情報なし</span>' : ''}
+              </div>
+              <div class="text-[10px] text-slate-400 truncate mt-0.5">
+                ${escapeHtml(s.artist) || '歌手未設定'} ${s.year ? '• ' + s.year + '年' : ''} ${s.genre ? '• ' + escapeHtml(s.genre) : ''}
+              </div>
+            </div>
+          </div>
+        `}
       </div>
     `;
   }).join('');
 }
+
+
+window.updateBulkField = function(idx, field, val) {
+  if (!bulkCandidateSongs[idx]) return;
+  bulkCandidateSongs[idx][field] = val;
+};
+
+window.reSearchBulkCandidate = async function(idx) {
+  const item = bulkCandidateSongs[idx];
+  if (!item) return;
+  const q = `${item.title} ${item.artist}`.trim() || item.originalQuery;
+  try {
+    const data = await fetchITunesApi(q, 1);
+    if (data.results && data.results.length > 0) {
+      const hit = data.results[0];
+      item.title = hit.trackName;
+      item.artist = hit.artistName;
+      item.year = hit.releaseDate ? hit.releaseDate.substring(0, 4) : '';
+      item.genre = hit.primaryGenreName || 'J-Pop';
+      item.artwork = hit.artworkUrl100 || '';
+      item.previewUrl = hit.previewUrl || '';
+      item.duration = hit.trackTimeMillis ? `${Math.floor(hit.trackTimeMillis/60000)}:${Math.floor((hit.trackTimeMillis%60000)/1000).toString().padStart(2,'0')}` : '';
+      item.durationMs = hit.trackTimeMillis || 0;
+      item.notFound = false;
+      alert("✓ iTunesから最新情報を再取得しました！");
+    } else {
+      alert("一致する楽曲が見つかりませんでした。");
+    }
+  } catch (e) {
+    alert("検索エラー: " + e.message);
+  }
+  renderBulkPreview();
+};
 
 window.toggleEditBulkCandidate = function(idx) {
   bulkCandidateSongs[idx].isEditing = !bulkCandidateSongs[idx].isEditing;
@@ -1036,9 +1096,9 @@ window.togglePlayPreview = async function(url, id, trackName = '', artistName = 
   let playableUrl = url;
   if (!playableUrl && (trackId || (trackName && artistName))) {
     try {
-      const q = trackId ? `[https://itunes.apple.com/lookup?id=$](https://itunes.apple.com/lookup?id=$){trackId}&country=jp` : `${trackName} ${artistName}`;
+      const q = trackId ? `https://itunes.apple.com/lookup?id={trackId}&country=jp` : `${trackName} ${artistName}`;
       const data = trackId 
-        ? await fetch(`[https://itunes.apple.com/lookup?id=$](https://itunes.apple.com/lookup?id=$){trackId}&country=jp`).then(r => r.json())
+        ? await fetch(`https://itunes.apple.com/lookup?id={trackId}&country=jp`).then(r => r.json())
         : await fetchITunesApi(q, 1);
       if (data.results && data.results.length > 0 && data.results[0].previewUrl) {
         playableUrl = data.results[0].previewUrl;
@@ -1865,7 +1925,7 @@ window.render = function() {
 
   listContainer.innerHTML = filtered.map(s => {
     const isPlaying = currentPlayingId === s.id;
-    const lyricsSearchUrl = `[https://www.google.com/search?q=$](https://www.google.com/search?q=$){encodeURIComponent(s.title + ' ' + (s.artist || '') + ' 歌詞')}`;
+    const lyricsSearchUrl = `https://www.google.com/search?q={encodeURIComponent(s.title + ' ' + (s.artist || '') + ' 歌詞')}`;
     const hasUndo = undoHistory[s.id] !== undefined;
     const inSetlist = setlist.some(x => String(x) === String(s.id));
     const isExpanded = expandedCardIds.has(s.id);
@@ -1968,7 +2028,7 @@ window.render = function() {
               <a href="${lyricsSearchUrl}" target="_blank" rel="noopener" class="text-slate-400 hover:text-sky-400 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700 flex items-center gap-1 whitespace-nowrap">
                 📄 歌詞
               </a>
-              <a href="[https://www.youtube.com/results?search_query=$](https://www.youtube.com/results?search_query=$){encodeURIComponent((s.artist ? s.artist + ' ' : '') + s.title)}" target="_blank" rel="noopener" class="text-slate-400 hover:text-red-400 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700 flex items-center gap-1 whitespace-nowrap">
+              <a href="https://www.youtube.com/results?search_query={encodeURIComponent((s.artist ? s.artist + ' ' : '') + s.title)}" target="_blank" rel="noopener" class="text-slate-400 hover:text-red-400 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700 flex items-center gap-1 whitespace-nowrap">
                 ▶️ YT
               </a>
               <button onclick="deleteSong('${s.id}')" class="text-slate-500 hover:text-rose-400 bg-slate-800 border border-slate-700 p-1 rounded-lg text-xs" title="削除">🗑️</button>
@@ -2609,7 +2669,7 @@ ${songListText}
 
     for (const modelName of modelsSequence) {
       try {
-        const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/$](https://generativelanguage.googleapis.com/v1beta/models/$){modelName}:generateContent?key=${apiKey}`, {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
@@ -3138,7 +3198,7 @@ window.selectCardScope = function(scope) {
   generateCardShareLink();
 };
 
-function generateCardShareLink() {
+async function generateCardShareLink() {
   let targetSongs = [];
   if (currentCardScope === 'mastered') {
     targetSongs = (window.songs || []).filter(s => s.score === '得意');
@@ -3150,7 +3210,8 @@ function generateCardShareLink() {
     targetSongs = setlist.map(id => (window.songs || []).find(s => String(s.id) === String(id))).filter(Boolean);
   }
 
-  document.getElementById('cardShareCountBadge').textContent = `${targetSongs.length}曲`;
+  const countEl = document.getElementById('cardShareCountBadge');
+  if (countEl) countEl.textContent = `${targetSongs.length}曲`;
 
   const miniData = targetSongs.map(s => [
     s.title || '',
@@ -3160,12 +3221,30 @@ function generateCardShareLink() {
     s.previewUrl || ''
   ]);
 
-  const jsonStr = JSON.stringify(miniData);
-  const base64Data = btoa(encodeURIComponent(jsonStr));
-  const url = `${window.location.origin}${window.location.pathname}#card=${base64Data}`;
+  let finalUrl = '';
+  // 方式A: Firestoreが利用可能な場合は shared_cards コレクションに短縮保存
+  if (!isDemoMode && window.firestoreOps && window.db) {
+    try {
+      const { collection, addDoc } = window.firestoreOps;
+      const docRef = await addDoc(collection(window.db, "shared_cards"), {
+        songs: miniData,
+        createdAt: Date.now()
+      });
+      finalUrl = `${window.location.origin}${window.location.pathname}#card=doc_${docRef.id}`;
+    } catch (e) {
+      console.warn("Firestore shared_card save failed, fallback to base64:", e);
+    }
+  }
+
+  // デモモードまたはFirestore未接続時のフォールバック (Base64)
+  if (!finalUrl) {
+    const jsonStr = JSON.stringify(miniData);
+    const base64Data = btoa(encodeURIComponent(jsonStr));
+    finalUrl = `${window.location.origin}${window.location.pathname}#card=${base64Data}`;
+  }
 
   const input = document.getElementById('cardShareUrlInput');
-  if (input) input.value = url;
+  if (input) input.value = finalUrl;
 }
 
 window.copyCardShareUrl = function() {
@@ -3183,21 +3262,35 @@ window.copyCardShareUrl = function() {
 // ==========================================
 // 📱 QRコード表示・共有モーダル制御
 // ==========================================
-window.showShareQRCode = function(url, title = '共有QRコード') {
+window.showShareQRCode = function(url, title = '十八番名刺') {
   const container = document.getElementById('qrCanvasContainer');
   if (!container) return;
   container.innerHTML = '';
   const titleEl = document.getElementById('qrModalTitle');
   if (titleEl) titleEl.textContent = `${title} QRコード`;
 
+  // 大容量Base64のQR物理限界ガード
+  let targetUrl = url;
+  if (url.length > 2500) {
+    alert("⚠️ 曲数が非常に多いため、QRコードを最適化（上位曲のみ）して生成します。全件の共有には『コピー』をご利用ください。");
+    // 安全な長さにスライス
+    try {
+      const base64 = url.split('#card=')[1];
+      const list = JSON.parse(decodeURIComponent(atob(base64)));
+      const sliced = list.slice(0, 45);
+      const slicedBase64 = btoa(encodeURIComponent(JSON.stringify(sliced)));
+      targetUrl = `${window.location.origin}${window.location.pathname}#card=${slicedBase64}`;
+    } catch (e) {}
+  }
+
   if (typeof QRCode !== 'undefined') {
     new QRCode(container, {
-      text: url,
+      text: targetUrl,
       width: 180,
       height: 180,
       colorDark: "#020617",
       colorLight: "#ffffff",
-      correctLevel: QRCode.CorrectLevel.H
+      correctLevel: QRCode.CorrectLevel.M
     });
   } else {
     container.innerHTML = '<span class="text-xs text-rose-500">QR生成ライブラリの読み込みに失敗しました</span>';
@@ -3205,6 +3298,12 @@ window.showShareQRCode = function(url, title = '共有QRコード') {
 
   document.getElementById('qrCodeModal')?.classList.remove('hidden');
   lockBodyScroll(true);
+};
+
+window.showDirectIntroQRCode = function() {
+  const cleanUrl = window.location.origin + window.location.pathname;
+  const introUrl = `${cleanUrl}#intro`;
+  showShareQRCode(introUrl, 'OHAKO紹介');
 };
 
 window.closeShareQRCode = function() {
@@ -3222,7 +3321,7 @@ window.copyDirectIntroUrl = function() {
   });
 };
 
-function checkAndOpenSharedCard() {
+async function checkAndOpenSharedCard() {
   const hash = window.location.hash;
   if (hash === '#intro') {
     const reopenBtn = document.getElementById('btnReopenSharedCard');
@@ -3239,12 +3338,30 @@ function checkAndOpenSharedCard() {
   const reopenBtn = document.getElementById('btnReopenSharedCard');
   if (reopenBtn) reopenBtn.classList.remove('hidden');
 
+  const cardPayload = hash.replace('#card=', '');
 
+  // 方式A: Firestore一時ドキュメントから読み出し
+  if (cardPayload.startsWith('doc_')) {
+    const docId = cardPayload.replace('doc_', '');
+    try {
+      if (window.firestoreOps && window.db) {
+        const { doc, getDoc } = window.firestoreOps;
+        const snap = await getDoc(doc(window.db, "shared_cards", docId));
+        if (snap.exists() && snap.data().songs) {
+          cachedSharedCardList = snap.data().songs;
+          renderCardViewScreen(cachedSharedCardList);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn("Firestore fetch card error:", err);
+    }
+  }
+
+  // デモモード / Base64展開
   try {
-    const base64 = hash.replace('#card=', '');
-    const jsonStr = decodeURIComponent(atob(base64));
+    const jsonStr = decodeURIComponent(atob(cardPayload));
     const list = JSON.parse(jsonStr);
-
     if (Array.isArray(list)) {
       cachedSharedCardList = list;
       renderCardViewScreen(list);
