@@ -3422,7 +3422,7 @@ window.selectCardScope = async function(scope) {
   await generateCardShareLink();
 };
 
-async async function generateCardShareLink() {
+async function generateCardShareLink() {
   let targetSongs = [];
   if (currentCardScope === 'mastered') {
     targetSongs = (window.songs || []).filter(s => s.score === '得意');
