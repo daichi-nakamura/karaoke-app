@@ -16,15 +16,17 @@ function getUserSafeMaxRank() {
 
 function calculateRecommendedKey(maxPitchStr) {
   const targetRank = getPitchRank(maxPitchStr);
-  if (targetRank === 0) return { diff: 0, text: "" };
   const safeRank = getUserSafeMaxRank();
   const safePitchName = getPitchNameFromRank(safeRank) || "hiA";
+  if (targetRank === 0) {
+    return { diff: 0, text: `※音域登録で適正キー診断 (安全圏:${safePitchName})` };
+  }
   const diff = safeRank - targetRank;
   
   if (diff >= 0) {
-    return { diff: 0, text: `原曲キー推奨 (上限:${safePitchName}に余裕あり)` };
+    return { diff: 0, text: `原曲キーでOK（上限:${safePitchName}に余裕あり）` };
   } else {
-    return { diff: diff, text: `推奨: ${diff} (${safePitchName}に適合)` };
+    return { diff: diff, text: `推奨キー: ${diff} (${safePitchName}に適合)` };
   }
 }
 
@@ -214,7 +216,23 @@ const PITCH_RANK = {
 
 function getPitchRank(pitch) {
   if (!pitch) return 0;
-  return PITCH_RANK[pitch.trim()] || 0;
+  let p = pitch.trim().replace(/\s+/g, '').replace(/＃/g, '#').replace(/♭/g, 'b');
+  // 抽出: hiA, mid2G, lowB などの正規パターン
+  if (PITCH_RANK[p]) return PITCH_RANK[p];
+  // 大文字小文字の揺れを吸収
+  const lower = p.toLowerCase();
+  for (const [k, v] of Object.entries(PITCH_RANK)) {
+    if (k.toLowerCase() === lower) return v;
+  }
+  // "hiA(サビ)" などの余計な注釈から音階部分を抽出
+  const match = p.match(/(low|mid1|mid2|hi|hihi)[A-G][#b]?/i);
+  if (match) {
+    const matchedLower = match[0].toLowerCase();
+    for (const [k, v] of Object.entries(PITCH_RANK)) {
+      if (k.toLowerCase() === matchedLower) return v;
+    }
+  }
+  return 0;
 }
 
 function getPitchNameFromRank(rank) {
@@ -719,10 +737,10 @@ function renderBulkPreview() {
         <div class="flex items-center justify-between text-[10px] text-slate-400 border-b border-slate-900 pb-1">
           <span class="truncate flex items-center gap-1">
             <span class="text-indigo-400 font-semibold">🔍 入力:</span>
-            <span class="text-slate-300 font-mono bg-slate-900 px-1.5 py-0.2 rounded border border-slate-800">「${escapeHtml(s.originalQuery)}」</span>
+            <span class="text-slate-300 font-mono bg-slate-900 px-1.5 py-0.2 rounded border border-slate-800 truncate max-w-[150px]">「${escapeHtml(s.originalQuery)}」</span>
           </span>
           <div class="flex items-center gap-1 shrink-0">
-            <button type="button" onclick="toggleEditBulkCandidate(${idx})" class="text-indigo-400 hover:text-indigo-300 px-1.5 py-0.5 rounded text-xs font-semibold bg-indigo-950 border border-indigo-800">
+            <button type="button" onclick="toggleEditBulkCandidate(${idx})" class="text-indigo-400 hover:text-indigo-300 px-2 py-0.5 rounded text-xs font-semibold bg-indigo-950 border border-indigo-800">
               ${s.isEditing ? '完了 ✓' : '✏️ 修正'}
             </button>
             <button type="button" onclick="removeBulkCandidate(${idx})" class="text-slate-500 hover:text-rose-400 px-1 text-xs">✕ 除外</button>
@@ -730,29 +748,53 @@ function renderBulkPreview() {
         </div>
 
         ${s.isEditing ? `
-          <!-- インライン編集フォーム -->
-          <div class="p-2 bg-slate-900 rounded-lg border border-indigo-700/60 space-y-2">
-            <div class="grid grid-cols-2 gap-1.5">
+          <!-- インライン直接編集 ＆ 複数候補再検索ピッカー -->
+          <div class="p-2.5 bg-slate-900/95 rounded-xl border border-indigo-500/70 space-y-2 mt-1">
+            <div class="grid grid-cols-2 gap-2">
               <div>
-                <label class="block text-[9px] text-slate-400">曲名</label>
-                <input type="text" value="${escapeHtml(s.title)}" onchange="updateBulkField(${idx}, 'title', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-xs text-white">
+                <label class="block text-[9px] text-slate-400 mb-0.5">曲名</label>
+                <input type="text" value="${escapeHtml(s.title)}" oninput="bulkCandidateSongs[${idx}].title=this.value" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-indigo-500">
               </div>
               <div>
-                <label class="block text-[9px] text-slate-400">歌手名</label>
-                <input type="text" value="${escapeHtml(s.artist)}" onchange="updateBulkField(${idx}, 'artist', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-xs text-white">
+                <label class="block text-[9px] text-slate-400 mb-0.5">歌手名</label>
+                <input type="text" value="${escapeHtml(s.artist)}" oninput="bulkCandidateSongs[${idx}].artist=this.value" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-indigo-500">
               </div>
             </div>
-            <div class="flex items-center justify-between gap-1.5 pt-0.5">
-              <div class="flex items-center gap-1.5">
-                <span class="text-[9px] text-slate-400">キー:</span>
-                <select onchange="updateBulkField(${idx}, 'key', this.value)" class="bg-slate-950 border border-slate-700 rounded px-1 py-0.5 text-[10px] text-slate-200">
+
+            <div class="flex items-center justify-between gap-1.5 pt-1 border-t border-slate-800">
+              <div class="flex items-center gap-1">
+                <span class="text-[10px] text-slate-400">キー:</span>
+                <select onchange="bulkCandidateSongs[${idx}].key=this.value; renderBulkPreview()" class="bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-[10px] text-slate-200 focus:outline-none">
                   ${['-6','-5','-4','-3','-2','-1','0','+1','+2','+3','+4','+5','+6'].map(k => `<option value="${k}" ${s.key === k ? 'selected' : ''}>${k === '0' ? '原曲' : k}</option>`).join('')}
                 </select>
               </div>
-              <button type="button" onclick="reSearchBulkCandidate(${idx})" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-2 py-0.5 rounded flex items-center gap-1">
-                🔄 iTunes再検索
+
+              <button type="button" onclick="reSearchBulkCandidate(${idx})" class="text-[10px] bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-3 py-1 rounded-lg transition flex items-center gap-1 shadow-sm">
+                <span>🔄 候補をiTunes再検索</span>
               </button>
             </div>
+
+            ${s.isReSearching ? `<div class="text-[10px] text-indigo-300 py-2 text-center animate-pulse">⏳ iTunesから候補を検索中...</div>` : ''}
+
+            <!-- 複数候補ピッカー一覧 -->
+            ${s.reSearchResults && s.reSearchResults.length > 0 ? `
+              <div class="space-y-1.5 pt-2 border-t border-slate-800 max-h-48 overflow-y-auto no-scrollbar">
+                <div class="text-[10px] text-indigo-300 font-bold flex justify-between items-center px-0.5">
+                  <span>該当候補 (${s.reSearchResults.length}件 - タップで反映):</span>
+                  <button type="button" onclick="bulkCandidateSongs[${idx}].reSearchResults=[]; renderBulkPreview();" class="text-slate-400 hover:text-white text-[10px]">✕ 閉じる</button>
+                </div>
+                ${s.reSearchResults.map((res, rIdx) => `
+                  <div onclick="selectBulkReSearchResult(${idx}, ${rIdx})" class="flex items-center gap-2 p-2 bg-slate-950 hover:bg-indigo-950/70 border border-slate-800 hover:border-indigo-500 rounded-lg cursor-pointer transition">
+                    <img src="${res.artwork || ''}" class="w-8 h-8 rounded object-cover bg-slate-800 shrink-0">
+                    <div class="min-w-0 flex-1">
+                      <div class="font-bold text-white text-[11px] truncate">${escapeHtml(res.title)}</div>
+                      <div class="text-[9px] text-slate-400 truncate">${escapeHtml(res.artist)} • ${res.year ? res.year + '年 • ' : ''}${escapeHtml(res.genre || '')}</div>
+                    </div>
+                    <span class="text-[9px] text-indigo-300 font-bold bg-indigo-950 border border-indigo-700 px-2 py-0.5 rounded shrink-0">選択</span>
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
           </div>
         ` : `
           <div class="flex items-center gap-2.5">
@@ -785,38 +827,12 @@ function renderBulkPreview() {
   }).join('');
 }
 
-
 window.updateBulkField = function(idx, field, val) {
   if (!bulkCandidateSongs[idx]) return;
   bulkCandidateSongs[idx][field] = val;
 };
 
-window.reSearchBulkCandidate = async function(idx) {
-  const item = bulkCandidateSongs[idx];
-  if (!item) return;
-  const q = `${item.title} ${item.artist}`.trim() || item.originalQuery;
-  try {
-    const data = await fetchITunesApi(q, 1);
-    if (data.results && data.results.length > 0) {
-      const hit = data.results[0];
-      item.title = hit.trackName;
-      item.artist = hit.artistName;
-      item.year = hit.releaseDate ? hit.releaseDate.substring(0, 4) : '';
-      item.genre = hit.primaryGenreName || 'J-Pop';
-      item.artwork = hit.artworkUrl100 || '';
-      item.previewUrl = hit.previewUrl || '';
-      item.duration = hit.trackTimeMillis ? `${Math.floor(hit.trackTimeMillis/60000)}:${Math.floor((hit.trackTimeMillis%60000)/1000).toString().padStart(2,'0')}` : '';
-      item.durationMs = hit.trackTimeMillis || 0;
-      item.notFound = false;
-      alert("✓ iTunesから最新情報を再取得しました！");
-    } else {
-      alert("一致する楽曲が見つかりませんでした。");
-    }
-  } catch (e) {
-    alert("検索エラー: " + e.message);
-  }
-  renderBulkPreview();
-};
+
 
 
 window.reSearchBulkCandidate = async function(idx) {
@@ -1071,10 +1087,15 @@ window.startDataMigration = async function() {
   if (!window.songs || window.songs.length === 0) return alert("曲データが存在しません。");
   const progressEl = document.getElementById('migrateProgressText');
   const btnEl = document.getElementById('btnMigrate');
-  const targets = window.songs.filter(s => !s.artwork || !s.previewUrl || !s.durationMs || !s.year || s.isWarmup === undefined);
   
-  if (targets.length === 0) return alert("✨ すべての曲データはすでに最新情報で補完されています！");
-  if (!confirm(`全${window.songs.length}曲中、未補完の曲が【${targets.length}曲】見つかりました。\niTunesから情報を自動取得して更新しますか？`)) return;
+  const warmupTargets = window.songs.filter(s => s.isWarmup === undefined);
+  const infoTargets = window.songs.filter(s => !s.artwork || !s.previewUrl || !s.durationMs || !s.year);
+  
+  if (warmupTargets.length === 0 && infoTargets.length === 0) {
+    return alert("✨ すべての曲データはすでに最新情報で補完されています！");
+  }
+
+  if (!confirm(`全${window.songs.length}曲中、未設定のウォームアップ適性判定 (${warmupTargets.length}曲) および未補完データを一括アップデートしますか？`)) return;
 
   btnEl.disabled = true;
   btnEl.classList.add('opacity-50');
@@ -1082,9 +1103,31 @@ window.startDataMigration = async function() {
 
   let updatedCount = 0;
 
-  for (let i = 0; i < targets.length; i++) {
-    const s = targets[i];
-    progressEl.textContent = `⏳ 補完処理中 (${i + 1}/${targets.length}): ${s.title}`;
+  // 1. ウォームアップ適性の未設定曲を一括自動判定・保存
+  for (let i = 0; i < window.songs.length; i++) {
+    const s = window.songs[i];
+    if (s.isWarmup === undefined) {
+      progressEl.textContent = `☕️ ウォームアップ評価中 (${i + 1}/${window.songs.length}): ${s.title}`;
+      const autoWarm = evaluateWarmupSuitability({
+        durationMs: s.durationMs || 240000,
+        maxPitch: s.maxPitch || '',
+        score: s.score || '歌える'
+      });
+      s.isWarmup = autoWarm;
+      if (isDemoMode) {
+        saveLocalDemoSongs();
+      } else if (window.firestoreOps) {
+        const { doc, updateDoc } = window.firestoreOps;
+        await updateDoc(doc(window.db, "songs", s.id), { isWarmup: autoWarm });
+      }
+      updatedCount++;
+    }
+  }
+
+  // 2. iTunes未補完情報の取得
+  for (let i = 0; i < infoTargets.length; i++) {
+    const s = infoTargets[i];
+    progressEl.textContent = `⏳ iTunes補完中 (${i + 1}/${infoTargets.length}): ${s.title}`;
     try {
       const data = await fetchITunesApi((s.title + ' ' + (s.artist || '')).trim(), 1);
       if (data.results && data.results.length > 0) {
@@ -1101,16 +1144,6 @@ window.startDataMigration = async function() {
         if (!s.year && hit.releaseDate) patch.year = hit.releaseDate.substring(0, 4);
         if (!s.genre && hit.primaryGenreName) patch.genre = hit.primaryGenreName;
         if (!s.duetType) patch.duetType = checkIsDuet(hit.trackName, hit.artistName) ? 'duet' : 'solo';
-
-        // ウォームアップ適性の未設定曲に対する自動評価（ユーザー設定値は保護）
-        if (s.isWarmup === undefined) {
-          const autoWarm = evaluateWarmupSuitability({
-            durationMs: s.durationMs || patch.durationMs || 0,
-            maxPitch: s.maxPitch || patch.maxPitch || '',
-            score: s.score || '歌える'
-          });
-          patch.isWarmup = autoWarm;
-        }
 
         if (Object.keys(patch).length > 0) {
           if (isDemoMode) {
@@ -1131,8 +1164,8 @@ window.startDataMigration = async function() {
   if (isDemoMode) saveLocalDemoSongs();
   btnEl.disabled = false;
   btnEl.classList.remove('opacity-50');
-  progressEl.textContent = `🎉 完了！ ${updatedCount}曲のデータを最新に更新しました。`;
-  alert(`補完が完了しました！\n更新された曲数: ${updatedCount}件`);
+  progressEl.textContent = `🎉 完了！ ${updatedCount}件のデータを最新に更新しました。`;
+  alert(`一括アップデートが完了しました！\n更新件数: ${updatedCount}件`);
   render();
 };
 
@@ -2567,8 +2600,7 @@ function resetModalInputs() {
   document.getElementById('formScore').value = 'これから';
   const warmupEl = document.getElementById('formIsWarmup');
   if (warmupEl) warmupEl.checked = false;
-  const sugEl = document.getElementById('formKeySuggestionText');
-  if (sugEl) sugEl.textContent = '';
+  updateKeySuggestionForForm('');
   
   document.getElementById('apiSearchResults').innerHTML = '';
   document.getElementById('apiSearchResults').classList.add('hidden');
@@ -2621,15 +2653,7 @@ window.openEditModal = function(id) {
   const warmupEl = document.getElementById('formIsWarmup');
   if (warmupEl) warmupEl.checked = !!s.isWarmup; // 手動設定を100%保持
   
-  const sugEl = document.getElementById('formKeySuggestionText');
-  if (sugEl) {
-    if (s.maxPitch) {
-      const rec = calculateRecommendedKey(s.maxPitch);
-      sugEl.innerHTML = rec.text ? `<button type="button" onclick="applySuggestedKey('${rec.diff}')" class="underline hover:text-white">💡 ${rec.text}</button>` : '';
-    } else {
-      sugEl.innerHTML = '<span class="text-slate-500 text-[10px]">※最高音の登録でキー診断</span>';
-    }
-  }
+  updateKeySuggestionForForm(s.maxPitch);
   document.getElementById('formTags').value = (s.tags || []).join(', ');
   document.getElementById('formMemo').value = s.memo || '';
   
@@ -3398,7 +3422,7 @@ window.selectCardScope = async function(scope) {
   await generateCardShareLink();
 };
 
-async function generateCardShareLink() {
+async async function generateCardShareLink() {
   let targetSongs = [];
   if (currentCardScope === 'mastered') {
     targetSongs = (window.songs || []).filter(s => s.score === '得意');
@@ -3421,8 +3445,11 @@ async function generateCardShareLink() {
     s.previewUrl || ''
   ]);
 
+  const input = document.getElementById('cardShareUrlInput');
+  if (input) input.value = "URL発行中...";
+
   let finalUrl = '';
-  // 方式A: Firestoreが利用可能な場合は shared_cards コレクションに短縮保存
+  // 方式A: Firestore利用可能時は shared_cards に保存して短縮ID発行
   if (window.firestoreOps && window.db) {
     try {
       const { collection, addDoc } = window.firestoreOps;
@@ -3432,18 +3459,16 @@ async function generateCardShareLink() {
       });
       finalUrl = `${window.location.origin}${window.location.pathname}#card=doc_${docRef.id}`;
     } catch (e) {
-      console.warn("Firestore shared_card save failed, fallback to base64:", e);
+      console.warn("Firestore shared_card save failed:", e);
     }
   }
 
-  // デモモードまたはFirestore未接続時のフォールバック (Base64)
+  // デモモードまたはFirestore未接続時: TSV + Deflate 超圧縮
   if (!finalUrl) {
-    const jsonStr = JSON.stringify(miniData);
-    const base64Data = btoa(encodeURIComponent(jsonStr));
-    finalUrl = `${window.location.origin}${window.location.pathname}#card=${base64Data}`;
+    const compressedHash = await compressCardDataToUrlHash(miniData);
+    finalUrl = `${window.location.origin}${window.location.pathname}#card=${compressedHash}`;
   }
 
-  const input = document.getElementById('cardShareUrlInput');
   if (input) input.value = finalUrl;
 }
 
@@ -3462,42 +3487,59 @@ window.copyCardShareUrl = function() {
 // ==========================================
 // 📱 QRコード表示・共有モーダル制御
 // ==========================================
-window.showShareQRCode = function(url, title = '十八番名刺') {
+window.showShareQRCode = async function(url, title = '十八番名刺') {
   const container = document.getElementById('qrCanvasContainer');
   if (!container) return;
-  container.innerHTML = '';
+  container.innerHTML = '<div class="text-slate-400 text-xs py-10">QR生成中...</div>';
   const titleEl = document.getElementById('qrModalTitle');
   if (titleEl) titleEl.textContent = `${title} QRコード`;
+  document.getElementById('qrCodeModal')?.classList.remove('hidden');
+  lockBodyScroll(true);
 
-  // 大容量Base64のQR物理限界ガード
   let targetUrl = url;
-  if (url.length > 2500) {
-    alert("⚠️ 曲数が非常に多いため、QRコードを最適化（上位曲のみ）して生成します。全件の共有には『コピー』をご利用ください。");
-    // 安全な長さにスライス
-    try {
-      const base64 = url.split('#card=')[1];
-      const list = JSON.parse(decodeURIComponent(atob(base64)));
-      const sliced = list.slice(0, 45);
-      const slicedBase64 = btoa(encodeURIComponent(JSON.stringify(sliced)));
-      targetUrl = `${window.location.origin}${window.location.pathname}#card=${slicedBase64}`;
-    } catch (e) {}
+  if (!targetUrl || targetUrl === "URL発行中...") {
+    // URL入力欄の最新値を取得
+    const input = document.getElementById('cardShareUrlInput');
+    if (input && input.value && input.value !== "URL発行中...") {
+      targetUrl = input.value;
+    } else {
+      await generateCardShareLink();
+      targetUrl = document.getElementById('cardShareUrlInput')?.value || '';
+    }
   }
 
+  // 快適読み取り上限ガード (URLが2000文字を超える場合は安全な上位曲にスライスして生成)
+  if (targetUrl.length > 2000) {
+    alert("⚠️ 曲数が非常に多いため、QRコードを最適化（上位曲のみ）して生成します。全件の共有には『コピー』をご利用ください。");
+    try {
+      const payload = targetUrl.split('#card=')[1];
+      const list = await decompressCardDataFromUrlHash(payload);
+      const sliced = list.slice(0, 40);
+      const slicedHash = await compressCardDataToUrlHash(sliced);
+      targetUrl = `${window.location.origin}${window.location.pathname}#card=${slicedHash}`;
+    } catch (e) {
+      console.warn("QR slice failed:", e);
+    }
+  }
+
+  container.innerHTML = '';
   if (typeof QRCode !== 'undefined') {
-    new QRCode(container, {
-      text: targetUrl,
-      width: 180,
-      height: 180,
-      colorDark: "#020617",
-      colorLight: "#ffffff",
-      correctLevel: QRCode.CorrectLevel.M
-    });
+    try {
+      new QRCode(container, {
+        text: targetUrl,
+        width: 180,
+        height: 180,
+        colorDark: "#020617",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    } catch (err) {
+      console.error("QRCode generation error:", err);
+      container.innerHTML = '<span class="text-xs text-rose-400">QRコードの生成に失敗しました。全件の共有には「コピー」をご利用ください。</span>';
+    }
   } else {
     container.innerHTML = '<span class="text-xs text-rose-500">QR生成ライブラリの読み込みに失敗しました</span>';
   }
-
-  document.getElementById('qrCodeModal')?.classList.remove('hidden');
-  lockBodyScroll(true);
 };
 
 window.showDirectIntroQRCode = function() {
@@ -3858,4 +3900,34 @@ window.switchMainTab = function(tab) {
 // Initialize on load
 window.addEventListener('DOMContentLoaded', () => {
   setTimeout(initLivingMascot, 200);
+});
+
+
+
+window.applySuggestedKey = function(diff) {
+  const keyEl = document.getElementById('formKey');
+  if (!keyEl) return;
+  const val = parseInt(diff, 10);
+  if (isNaN(val) || val === 0) {
+    keyEl.value = '0';
+  } else {
+    keyEl.value = val > 0 ? `+${val}` : `${val}`;
+  }
+};
+
+window.updateKeySuggestionForForm = function(maxPitchVal) {
+  const sugEl = document.getElementById('formKeySuggestionText');
+  if (!sugEl) return;
+  const val = (maxPitchVal || '').trim();
+  if (!val) {
+    sugEl.innerHTML = '<span class="text-slate-500 text-[10px]">※最高音の登録でキー診断</span>';
+    return;
+  }
+  const rec = calculateRecommendedKey(val);
+  sugEl.innerHTML = rec.text ? `<button type="button" onclick="applySuggestedKey('${rec.diff}')" class="underline hover:text-white" title="クリックでキー設定に反映">💡 ${rec.text}</button>` : '';
+};
+
+// 入力イベントリスナー
+document.getElementById('formMaxPitch')?.addEventListener('input', (e) => {
+  updateKeySuggestionForForm(e.target.value);
 });
