@@ -429,7 +429,7 @@
           <button type="button" onclick="copyCardShareUrl()" id="btnCopyCardUrl" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap">
             コピー
           </button>
-          <button type="button" onclick="showShareQRCode(document.getElementById('cardShareUrlInput').value, '十八番名刺')" class="bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap">
+          <button type="button" onclick="showShareQRCode(document.getElementById('cardShareUrlInput')?.value || '', '十八番名刺')" class="bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap">
             📱 QR
           </button>
         </div>
@@ -1040,7 +1040,7 @@
           <div class="grid grid-cols-2 gap-2 bg-slate-950/60 p-2 rounded-xl border border-slate-800/80">
             <div>
               <label class="block text-[11px] text-amber-400 mb-1">🔥 最高音</label>
-              <input type="text" id="formMaxPitch" placeholder="例: hiA, mid2G" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-500">
+              <input type="text" id="formMaxPitch" oninput="updateKeySuggestionForForm(this.value)" placeholder="例: hiA, mid2G" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-500">
             </div>
             <div>
               <label class="block text-[11px] text-sky-400 mb-1">💧 最低音</label>
