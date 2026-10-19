@@ -47,7 +47,8 @@ function evaluateWarmupSuitability(songObj) {
 // ==========================================
 async function compressCardDataToUrlHash(miniData) {
   const scoreNumMap = { 'これから': '0', '練習中': '1', '歌える': '2', '得意': '3' };
-  const lines = miniData.map(d => `${d[0]}\t${d[1]}\t${d[2]}\t${scoreNumMap[d[3]] || '0'}\t${d[4] || ''}`);
+  // 長大な試聴URLを除外し、[タイトル, 歌手, キー, 習熟度] のみで超軽量TSV作成
+  const lines = miniData.map(d => `${d[0]}\t${d[1]}\t${d[2]}\t${scoreNumMap[d[3]] || '0'}`);
   const tsvText = lines.join('\n');
 
   try {
@@ -68,6 +69,7 @@ async function compressCardDataToUrlHash(miniData) {
 }
 
 async function decompressCardDataFromUrlHash(hashPayload) {
+  if (!hashPayload) return [];
   if (hashPayload.startsWith('z_')) {
     const rawB64 = hashPayload.substring(2);
     try {
@@ -86,7 +88,7 @@ async function decompressCardDataFromUrlHash(hashPayload) {
           parts[1] || '',
           parts[2] || '0',
           numScoreMap[parts[3]] || parts[3] || 'これから',
-          parts[4] || ''
+          '' // 試聴音源URL（オンデマンド取得対応）
         ];
       });
     } catch (err) {
@@ -95,10 +97,14 @@ async function decompressCardDataFromUrlHash(hashPayload) {
   }
 
   // Legacy Base64 JSON fallback
-  const jsonStr = decodeURIComponent(atob(hashPayload));
-  return JSON.parse(jsonStr);
+  try {
+    const jsonStr = decodeURIComponent(atob(hashPayload));
+    return JSON.parse(jsonStr);
+  } catch (err) {
+    console.error("Legacy base64 decode error:", err);
+    return [];
+  }
 }
-
 
 // app.js
 window.songs = [];
@@ -3437,40 +3443,46 @@ async function generateCardShareLink() {
   const countEl = document.getElementById('cardShareCountBadge');
   if (countEl) countEl.textContent = `${targetSongs.length}曲`;
 
-  const miniData = targetSongs.map(s => [
-    s.title || '',
-    s.artist || '',
-    s.key || '0',
-    s.score || 'これから',
-    s.previewUrl || ''
-  ]);
-
   const input = document.getElementById('cardShareUrlInput');
   if (input) input.value = "URL発行中...";
 
   let finalUrl = '';
   // 方式A: Firestore利用可能時は shared_cards に保存して短縮ID発行
+  // ※重要: Firestoreは2次元配列禁止のため、必ずプレーンオブジェクトの配列で保存
   if (window.firestoreOps && window.db) {
     try {
+      const firestoreSongs = targetSongs.map(s => ({
+        t: s.title || '',
+        a: s.artist || '',
+        k: s.key || '0',
+        s: s.score || 'これから'
+      }));
       const { collection, addDoc } = window.firestoreOps;
       const docRef = await addDoc(collection(window.db, "shared_cards"), {
-        songs: miniData,
+        songs: firestoreSongs,
         createdAt: Date.now()
       });
       finalUrl = `${window.location.origin}${window.location.pathname}#card=doc_${docRef.id}`;
     } catch (e) {
-      console.warn("Firestore shared_card save failed:", e);
+      console.warn("Firestore shared_card save failed, fallback to compressed URL:", e);
     }
   }
 
-  // デモモードまたはFirestore未接続時: TSV + Deflate 超圧縮
+  // 方式B（フォールバック）: 試聴URLを除外した TSV + Deflate 超圧縮URL
   if (!finalUrl) {
+    const miniData = targetSongs.map(s => [
+      s.title || '',
+      s.artist || '',
+      s.key || '0',
+      s.score || 'これから'
+    ]);
     const compressedHash = await compressCardDataToUrlHash(miniData);
     finalUrl = `${window.location.origin}${window.location.pathname}#card=${compressedHash}`;
   }
 
   if (input) input.value = finalUrl;
 }
+
 
 window.copyCardShareUrl = function() {
   const input = document.getElementById('cardShareUrlInput');
@@ -3590,7 +3602,12 @@ async function checkAndOpenSharedCard() {
         const { doc, getDoc } = window.firestoreOps;
         const snap = await getDoc(doc(window.db, "shared_cards", docId));
         if (snap.exists() && snap.data().songs) {
-          cachedSharedCardList = snap.data().songs;
+          const rawSongs = snap.data().songs;
+          // オブジェクト形式 {t, a, k, s} と配列形式の両方に対応
+          cachedSharedCardList = rawSongs.map(item => {
+            if (Array.isArray(item)) return item;
+            return [item.t || '', item.a || '', item.k || '0', item.s || 'これから', ''];
+          });
           renderCardViewScreen(cachedSharedCardList);
           return;
         }
@@ -3600,16 +3617,16 @@ async function checkAndOpenSharedCard() {
     }
   }
 
-  // デモモード / Base64展開
+  // 方式B: TSV+Deflate圧縮URL（z_...）または旧Base64の展開
   try {
-    const jsonStr = decodeURIComponent(atob(cardPayload));
-    const list = JSON.parse(jsonStr);
-    if (Array.isArray(list)) {
+    const list = await decompressCardDataFromUrlHash(cardPayload);
+    if (Array.isArray(list) && list.length > 0) {
       cachedSharedCardList = list;
       renderCardViewScreen(list);
+      return;
     }
   } catch (e) {
-    console.error("名刺データの解析に失敗しました:", e);
+    console.error("名刺データの展開に失敗しました:", e);
   }
 }
 
@@ -3639,11 +3656,9 @@ function renderCardViewScreen(list) {
             <span class="bg-indigo-950/80 border border-indigo-800 text-indigo-300 px-1.5 py-0.2 rounded">${escapeHtml(score)}</span>
           </div>
         </div>
-        ${previewUrl ? `
-          <button onclick="togglePlayPreview('${previewUrl}', '${playId}', '${escapeHtml(title)}', '${escapeHtml(artist)}')" class="shrink-0 bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-bold">
-            ${isPlaying ? '⏹ 停止' : '▶ 試聴'}
-          </button>
-        ` : ''}
+        <button onclick="togglePlayPreview('${previewUrl || ''}', '${playId}', '${escapeHtml(title)}', '${escapeHtml(artist)}')" class="shrink-0 bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-bold transition">
+          ${isPlaying ? '⏹ 停止' : '▶ 試聴'}
+        </button>
       </div>
     `;
   }).join('');
@@ -3651,6 +3666,7 @@ function renderCardViewScreen(list) {
   modal.classList.remove('hidden');
   lockBodyScroll(true);
 }
+
 
 window.closeCardView = function() {
   document.getElementById('cardViewModal').classList.add('hidden');
